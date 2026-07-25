@@ -1,10 +1,10 @@
-# devenv
+# spawnbx
 
 A containerized development environment powered by Podman and Arch Linux.
 
 ## Overview
 
-`devenv` provides a ready-to-use, isolated development environment inside a Podman container. It automatically passes through GPU, audio, and GUI capabilities from the host, making it suitable for development that requires hardware acceleration, sound, or graphical applications — all while keeping your host system clean.
+`spawnbx` provides a ready-to-use, isolated development environment inside a Podman container. It automatically passes through GPU, audio, and GUI capabilities from the host, making it suitable for development that requires hardware acceleration, sound, or graphical applications — all while keeping your host system clean.
 
 ## Features
 
@@ -34,20 +34,20 @@ A containerized development environment powered by Podman and Arch Linux.
 2. **Launch the development environment:**
 
     ```sh
-    ./bin/devenv
+    ./bin/spawnbx
     ```
 
     Or add `bin/` to your `PATH` for convenience:
 
     ```sh
     export PATH="$PWD/bin:$PATH"
-    devenv
+    spawnbx
     ```
 
 ## Usage
 
 ```
-devenv [OPTIONS]
+spawnbx [OPTIONS]
 
 Options:
   -i, --image IMAGE   Container image to use (default: dev-arch)
@@ -55,14 +55,14 @@ Options:
   -h, --help          Show help message
 ```
 
-The container is named after the current directory. If a container with that name already exists, `devenv` will reattach to it (starting or unpausing if necessary).
+The container is named after the current directory. If a container with that name already exists, `spawnbx` will reattach to it (starting or unpausing if necessary).
 
 ## Project Structure
 
 ```
-devenv/
+spawnbx/
 ├── bin/
-│   └── devenv          # Main launcher script
+│   └── spawnbx          # Main launcher script
 ├── images/
 │   └── dev-arch/
 │       ├── Containerfile   # Arch Linux container image definition
@@ -84,5 +84,5 @@ images/
 Run `./build_images` to build it, then launch with:
 
 ```sh
-devenv -i my-image
+spawnbx -i my-image
 ```
