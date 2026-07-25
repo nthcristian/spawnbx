@@ -1,0 +1,32 @@
+FROM archlinux:latest
+
+# Install base-devel, fish, micro, and a few extra dev essentials
+RUN pacman -Syu --noconfirm && \
+    pacman -S --noconfirm \
+        base-devel \
+        fish \
+        zsh \
+        micro \
+        nano \
+        sudo \
+        git \
+        cmake \
+        pipewire \
+        pipewire-alsa \
+        pipewire-pulse \
+    && pacman -Scc --noconfirm \
+    && rm -rf /var/cache/pacman/pkg/*
+
+RUN useradd -m -d /home/dev -s /bin/nologin dev \
+	&& passwd -d dev \
+	&& echo "dev ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+# Set a working directory inside the container
+WORKDIR /workspace
+
+COPY entrypoint.sh /var/entrypoint.sh
+RUN chmod +x /var/entrypoint.sh
+
+ENTRYPOINT ["/var/entrypoint.sh"]
+
+USER dev
