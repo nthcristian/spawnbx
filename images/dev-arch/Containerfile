@@ -11,9 +11,8 @@ RUN pacman -Syu --noconfirm && \
         sudo \
         git \
         cmake \
-        pipewire \
-        pipewire-alsa \
-        pipewire-pulse \
+        less \
+        wl-clipboard \
     && pacman -Scc --noconfirm \
     && rm -rf /var/cache/pacman/pkg/*
 
