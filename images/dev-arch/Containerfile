@@ -16,7 +16,7 @@ RUN pacman -Syu --noconfirm && \
     && pacman -Scc --noconfirm \
     && rm -rf /var/cache/pacman/pkg/*
 
-RUN useradd -m -d /home/dev -s /bin/nologin dev \
+RUN useradd -m -d /home/dev -s /bin/bash dev \
 	&& passwd -d dev \
 	&& echo "dev ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
