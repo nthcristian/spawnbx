@@ -13,11 +13,19 @@ RUN pacman -Syu --noconfirm && \
         cmake \
         less \
         wl-clipboard \
+        openssh \
     && pacman -Scc --noconfirm \
     && rm -rf /var/cache/pacman/pkg/*
 
+RUN echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config \
+    && echo "PermitRootLogin no" >> /etc/ssh/sshd_config
+
+RUN ssh-keygen -A
+
+EXPOSE 22
+
 RUN useradd -m -d /home/dev -s /bin/bash dev \
-	&& passwd -d dev \
+	&& echo "dev:dev" | chpasswd \
 	&& echo "dev ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
 # Set a working directory inside the container

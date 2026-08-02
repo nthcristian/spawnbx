@@ -169,6 +169,7 @@ create_new() {
         --workdir /workspace \
         --userns=keep-id \
         --env SHELL="$SHELL_CMD" \
+        -p 2222:22 \
         "${GUI_FLAGS[@]}" \
         "${GPU_FLAGS[@]}" \
         "${AUDIO_FLAGS[@]}" \
