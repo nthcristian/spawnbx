@@ -10,5 +10,5 @@ sudo chown -R dev:dev /workspace
 echo "Starting sshd daemon..."
 sudo /usr/bin/sshd
 
-echo "Staring shell as dev user..."
+echo "Starting shell as dev user..."
 exec "$SHELL"
