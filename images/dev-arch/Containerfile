@@ -1,5 +1,13 @@
 FROM archlinux:latest
 
+RUN pacman -Sy --noconfirm reflector && \
+    reflector \
+      --latest 20 \
+      --protocol https \
+      --sort rate \
+      --save /etc/pacman.d/mirrorlist && \
+    pacman -Rns --noconfirm reflector
+
 # Install base-devel, fish, micro, and a few extra dev essentials
 RUN pacman -Syu --noconfirm && \
     pacman -S --noconfirm \
@@ -14,6 +22,18 @@ RUN pacman -Syu --noconfirm && \
         less \
         wl-clipboard \
         openssh \
+        wget \
+        tree-sitter-cli \
+        ripgrep \
+        fd \
+        npm \
+        unzip \
+        fzf \
+        lazygit \
+        ca-certificates \
+        python-pip \
+        luarocks \
+        neovim \
     && pacman -Scc --noconfirm \
     && rm -rf /var/cache/pacman/pkg/*
 
