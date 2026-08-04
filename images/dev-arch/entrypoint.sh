@@ -11,4 +11,5 @@ echo "Starting sshd daemon..."
 sudo /usr/bin/sshd
 
 echo "Starting shell as dev user..."
+sudo chsh -s "$SHELL" dev
 exec "$SHELL"
