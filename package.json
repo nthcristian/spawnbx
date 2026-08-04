@@ -10,7 +10,8 @@
   ],
   "files": [
     "bin/",
-    "images/"
+    "images/",
+    "README.md"
   ],
   "bin": {
     "spawnbx": "bin/spawnbx",

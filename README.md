@@ -2,6 +2,8 @@
 
 A containerized development environment powered by Podman and Arch Linux.
 
+[![npm version](https://img.shields.io/npm/v/spawnbx)](https://www.npmjs.com/package/spawnbx)
+
 ## Overview
 
 `spawnbx` provides a ready-to-use, isolated development environment inside a Podman container. It automatically passes through GPU, audio, and GUI capabilities from the host, making it suitable for development that requires hardware acceleration, sound, or graphical applications — all while keeping your host system clean.
@@ -20,32 +22,36 @@ A containerized development environment powered by Podman and Arch Linux.
 ## Requirements
 
 - [Podman](https://podman.io/)
+- [Node.js](https://nodejs.org/) ≥ 18 (for installing via npm)
 - For NVIDIA GPU passthrough: [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+
+## Installation
+
+```sh
+npm install -g spawnbx
+```
+
+This makes both `spawnbx` and `spawnbx-build` available on your `PATH`.
 
 ## Quick Start
 
 1. **Build the container image:**
 
-    ```sh
-    ./build_images
-    ```
+   ```sh
+   spawnbx-build
+   ```
 
-    This builds the `dev-arch` image from `images/dev-arch/Containerfile`.
+   This finds every `images/*/Containerfile` and builds it with `podman build`. By default that means the `dev-arch` image.
 
 2. **Launch the development environment:**
 
-    ```sh
-    ./bin/spawnbx
-    ```
-
-    Or add `bin/` to your `PATH` for convenience:
-
-    ```sh
-    export PATH="$PWD/bin:$PATH"
-    spawnbx
-    ```
+   ```sh
+   spawnbx
+   ```
 
 ## Usage
+
+### `spawnbx`
 
 ```
 spawnbx [OPTIONS]
@@ -58,6 +64,14 @@ Options:
 ```
 
 The container is named after the current directory. If a container with that name already exists, `spawnbx` will reattach to it (starting or unpausing if necessary).
+
+### `spawnbx-build`
+
+```
+spawnbx-build
+```
+
+Iterates over every subdirectory of `images/` that contains a `Containerfile` and runs `podman build -t <name> .` inside it. The image tag is the directory name (e.g. `dev-arch`).
 
 ### SSH Access
 
@@ -74,12 +88,13 @@ The default password is `dev`. SSH is configured with `PasswordAuthentication` e
 ```
 spawnbx/
 ├── bin/
-│   └── spawnbx          # Main launcher script
+│   ├── spawnbx          # Main launcher script
+│   └── spawnbx-build    # Image builder script
 ├── images/
 │   └── dev-arch/
 │       ├── Containerfile   # Arch Linux container image definition
 │       └── entrypoint.sh   # Container entrypoint (fixes permissions, starts sshd, launches shell)
-├── build_images            # Script to build all container images
+├── package.json            # npm package metadata
 ├── LICENSE
 └── README.md
 ```
@@ -94,7 +109,7 @@ images/
     └── Containerfile
 ```
 
-Run `./build_images` to build it, then launch with:
+Run `spawnbx-build` to build it, then launch with:
 
 ```sh
 spawnbx -i my-image
