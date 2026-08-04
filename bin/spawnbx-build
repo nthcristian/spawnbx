@@ -1,22 +1,22 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
-# Change to the directory where this script is located (optional, but good practice)
-cd "$(dirname "$0")" || exit 1
+script_path="$(dirname "$(realpath "$0")")"
+project_path="$(dirname $script_path)"
 
 # Loop through all subdirectories of ./images
-for dir in ./images/*/; do
+for dir in "$project_path"/images/*/; do
     # Remove trailing slash for cleaner output
     dir=${dir%/}
-    
+
     # Check if a Containerfile exists in this directory
     if [ -f "$dir/Containerfile" ]; then
         # Get the folder name (basename) for the image tag
         tag=$(basename "$dir")
         echo "Building image '$tag' from $dir ..."
-        
+
         # Run podman build inside the directory
         (cd "$dir" && podman build -t "$tag" .)
-        
+
         # Check the exit status and report
         if [ $? -eq 0 ]; then
             echo "Successfully built $tag"

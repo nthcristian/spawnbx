@@ -6,7 +6,7 @@ set -euo pipefail
 DEFAULT_IMAGE="dev-arch"
 DEFAULT_SHELL="/bin/bash"
 IMAGE="$DEFAULT_IMAGE"
-SHELL_CMD="$DEFAULT_SHELL"
+SHELL="$DEFAULT_SHELL"
 NAME="$(basename "$PWD")"
 
 # ------------------------------------------------------------------
@@ -22,8 +22,7 @@ Options:
                       (default: $DEFAULT_SHELL)
   -h, --help          Show this help message
 
-If the container already exists, it will be started/attached using the
-current options (they must match what was used to create it).
+If the container already exists, it will be started/attached using its original options.
 EOF
     exit 0
 }
@@ -36,7 +35,7 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         -s|--shell)
-            SHELL_CMD="$2"
+            SHELL="$2"
             shift 2
             ;;
         -h|--help)
@@ -168,7 +167,7 @@ create_new() {
         --volume "$PWD":/workspace \
         --workdir /workspace \
         --userns=keep-id \
-        --env SHELL="$SHELL_CMD" \
+        --env SHELL="$SHELL" \
         -p 2222:22 \
         "${GUI_FLAGS[@]}" \
         "${GPU_FLAGS[@]}" \

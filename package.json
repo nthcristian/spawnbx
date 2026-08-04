@@ -1,0 +1,29 @@
+{
+  "name": "spawnbx",
+  "version": "1.0.0",
+  "description": "A containerized development environment powered by Podman and Arch Linux",
+  "keywords": [
+    "container",
+    "devbox",
+    "devtools",
+    "podman"
+  ],
+  "files": [
+    "bin/",
+    "images/"
+  ],
+  "bin": {
+    "spawnbx": "bin/spawnbx",
+    "spawnbx-build": "bin/spawnbx-build"
+  },
+  "homepage": "https://github.com/nthcristian/spawnbx#readme",
+  "bugs": {
+    "url": "https://github.com/nthcristian/spawnbx/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nthcristian/spawnbx.git"
+  },
+  "license": "GPL-3.0",
+  "author": "nthcristian"
+}
