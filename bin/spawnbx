@@ -64,6 +64,7 @@ else
     # Intel / AMD GPU – pass DRI and keep group memberships
     GPU_FLAGS=(
         --device /dev/dri:/dev/dri
+        --device /dev/kfd:/dev/kfd
         --group-add keep-groups
     )
 fi
