@@ -17,7 +17,7 @@ A containerized development environment powered by Podman and Arch Linux.
 - **Persistent home** — `/home/dev` is stored in a named Podman volume, surviving container rebuilds
 - **Workspace mounting** — current working directory is mounted at `/workspace`
 - **User namespace mapping** — `--userns=keep-id` ensures file ownership matches the host user
-- **SSH access** — OpenSSH server runs inside the container, reachable on port `2222` (user `dev`, password `dev`)
+- **SSH-ready containers** — containers are placed on the `devcontainers` network and labeled for optional daemon-based SSH routing
 
 ## Requirements
 
@@ -49,6 +49,25 @@ This makes both `spawnbx` and `spawnbx-build` available on your `PATH`.
    spawnbx
    ```
 
+## Optional SSH Routing Daemon
+
+The SSH routing daemon is not installed or started by the npm package. It is
+an optional component that currently requires manual configuration and setup.
+
+The daemon watches running containers with the `DEV_CONTAINER` label and
+creates Unix sockets under `${XDG_RUNTIME_DIR}/container-ssh`. To run it:
+
+```sh
+cd daemon
+systemctl --user enable --now podman.socket
+podman network exists devcontainers || podman network create devcontainers
+podman compose up --build
+```
+
+The containers started by `spawnbx` already use the `devcontainers` network and
+the `DEV_CONTAINER` label. The `daemon/` directory is for manual development
+and deployment; it is intentionally not included in the npm package.
+
 ## Usage
 
 ### `spawnbx`
@@ -75,13 +94,11 @@ Iterates over every subdirectory of `images/` that contains a `Containerfile` an
 
 ### SSH Access
 
-The container runs an OpenSSH server and maps port `2222` on the host to port `22` inside the container. You can connect via:
-
-```sh
-ssh -p 2222 dev@localhost
-```
-
-The default password is `dev`. SSH is configured with `PasswordAuthentication` enabled and `PermitUserEnvironment` enabled, so any `SSH_*` environment variables set on the host are available inside the container.
+The container runs an OpenSSH server. When the optional routing daemon is
+running, configure your SSH client to connect through the Unix socket created
+for the target container. SSH is configured with `PasswordAuthentication`
+enabled and `PermitUserEnvironment` enabled, so any `SSH_*` environment
+variables set on the host are available inside the container.
 
 ## Project Structure
 
@@ -94,6 +111,7 @@ spawnbx/
 │   └── dev-arch/
 │       ├── Containerfile   # Arch Linux container image definition
 │       └── entrypoint.sh   # Container entrypoint (fixes permissions, starts sshd, launches shell)
+├── daemon/                  # Optional manually configured SSH routing daemon
 ├── package.json            # npm package metadata
 ├── LICENSE
 └── README.md
