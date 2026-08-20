@@ -1,0 +1,15 @@
+FROM rust:latest
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends podman \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY . .
+
+RUN chown -R 1000:1000 /app
+USER 1000:1000
+
+ENV RUST_BACKTRACE=1
+
+CMD ["cargo", "run"]
