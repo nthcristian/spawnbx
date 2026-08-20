@@ -163,13 +163,14 @@ create_new() {
     exec podman run -it \
         --name "$NAME" \
         --hostname "$NAME" \
+        --network devcontainers \
+        --label DEV_CONTAINER \
         --volume dev-home:/home/dev \
         --env HOME=/home/dev \
         --volume "$PWD":/workspace \
         --workdir /workspace \
         --userns=keep-id \
         --env SHELL="$SHELL" \
-        -p 2222:22 \
         "${GUI_FLAGS[@]}" \
         "${GPU_FLAGS[@]}" \
         "${AUDIO_FLAGS[@]}" \
