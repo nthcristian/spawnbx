@@ -17,6 +17,7 @@ RUN pacman -Syu --noconfirm \
     && pacman -S --noconfirm \
         fish \
         zsh \
+        nushell \
         micro \
         nano \
         helix \
@@ -32,6 +33,7 @@ RUN pacman -Syu --noconfirm \
         npm \
         unzip \
         fzf \
+        bat \
         ca-certificates \
     && pacman -Scc --noconfirm \
     && rm -rf /var/cache/pacman/pkg/*
