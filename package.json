@@ -1,6 +1,6 @@
 {
   "name": "spawnbx",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A containerized development environment powered by Podman and Arch Linux",
   "keywords": [
     "container",
