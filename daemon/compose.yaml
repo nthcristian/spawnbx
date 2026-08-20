@@ -1,0 +1,21 @@
+services:
+  ssh-router:
+    build:
+      context: .
+    container_name: ssh-router
+
+    userns_mode: keep-id
+    networks:
+      - devcontainers
+
+    environment:
+      XDG_RUNTIME_DIR: ${XDG_RUNTIME_DIR}
+      CONTAINER_HOST: unix://${XDG_RUNTIME_DIR}/podman/podman.sock
+
+    volumes:
+      - "${XDG_RUNTIME_DIR}:${XDG_RUNTIME_DIR}"
+      - "${XDG_RUNTIME_DIR}/container-ssh:${XDG_RUNTIME_DIR}/container-ssh"
+
+networks:
+  devcontainers:
+    external: true
