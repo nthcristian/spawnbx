@@ -29,34 +29,12 @@ impl PackageAdapter for NixCliAdapter {
         let lock_existed = plan.lock_path.exists();
         if plan.lock_policy.is_advance() {
             require_success(
-                executor.exec(
-                    target,
-                    ProcessCommand {
-                        executable: "nix".into(),
-                        arguments: vec![
-                            "flake".into(),
-                            "update".into(),
-                            "--flake".into(),
-                            plan.container_flake_dir.clone().into(),
-                        ],
-                    },
-                )?,
+                executor.exec(target, flake_command("update", &plan.container_flake_dir))?,
                 "nix flake update",
             )?;
         } else if !plan.lock_path.exists() {
             require_success(
-                executor.exec(
-                    target,
-                    ProcessCommand {
-                        executable: "nix".into(),
-                        arguments: vec![
-                            "flake".into(),
-                            "lock".into(),
-                            "--flake".into(),
-                            plan.container_flake_dir.clone().into(),
-                        ],
-                    },
-                )?,
+                executor.exec(target, flake_command("lock", &plan.container_flake_dir))?,
                 "nix flake lock",
             )?;
         }
@@ -113,5 +91,40 @@ fn require_success(
             category: "nix-command".to_owned(),
             message: format!("{operation}: {}", output.stderr.trim()),
         })
+    }
+}
+
+fn flake_command(operation: &str, directory: &str) -> ProcessCommand {
+    let arguments = if operation == "update" {
+        vec![
+            "flake".into(),
+            operation.into(),
+            "--flake".into(),
+            directory.into(),
+        ]
+    } else {
+        vec!["flake".into(), operation.into(), directory.into()]
+    };
+    ProcessCommand {
+        executable: "nix".into(),
+        arguments,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::flake_command;
+    use std::ffi::OsString;
+
+    #[test]
+    fn flake_lock_uses_positional_directory() {
+        assert_eq!(
+            flake_command("lock", "/workspace/.spawnbx/nix").arguments,
+            vec![
+                OsString::from("flake"),
+                OsString::from("lock"),
+                OsString::from("/workspace/.spawnbx/nix")
+            ]
+        );
     }
 }
