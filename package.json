@@ -1,6 +1,6 @@
 {
   "name": "spawnbx",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Linux development workspace containers backed by Docker and Nix",
   "bin": {
     "spawnbx": "bin/spawnbx"
