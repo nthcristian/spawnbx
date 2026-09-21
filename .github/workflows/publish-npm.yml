@@ -6,7 +6,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 concurrency:
@@ -31,12 +31,29 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Update package version
+      - name: Bump version if already published
         run: |
           set -eu
-          current_version="$(npm view spawnbx version)"
-          npm version "$current_version" --no-git-tag-version
-          npm version patch --no-git-tag-version
+          version="$(node -p "require('./package.json').version")"
+          latest="$(npm view spawnbx version 2>/dev/null || echo "none")"
+          if [ "$latest" = "none" ]; then
+            echo "Package not yet published; publishing $version as-is."
+          else
+            is_newer="$(node -e "
+              const [a,b,c] = '$version'.split('.').map(Number);
+              const [x,y,z] = '$latest'.split('.').map(Number);
+              console.log(a>x || (a===x && b>y) || (a===x && b===y && c>z) ? 'yes' : 'no')
+            ")"
+            if [ "$is_newer" = "yes" ]; then
+              echo "Local $version is newer than published $latest; publishing as-is."
+            else
+              echo "Local $version is not newer than published $latest; bumping patch."
+              git config user.email "github-actions[bot]@users.noreply.github.com"
+              git config user.name "github-actions[bot]"
+              npm version patch -m "chore: bump version to %s [skip ci]"
+              git push origin HEAD:main --follow-tags
+            fi
+          fi
           node -p '"Publishing spawnbx@" + require("./package.json").version'
 
       - name: Build binary
