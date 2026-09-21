@@ -64,6 +64,11 @@ impl DesiredStateModule for DesiredStateBuilder {
                     container_path: "/home/spawnbx".into(),
                     read_only: false,
                 },
+                Mount {
+                    host_path: project.state_paths.nix_dir.clone(),
+                    container_path: "/var/lib/spawnbx/nix".into(),
+                    read_only: false,
+                },
             ],
         };
         let packages = PackageIntent {
@@ -71,7 +76,7 @@ impl DesiredStateModule for DesiredStateBuilder {
             lock_policy: super::types::LockPolicy::RespectExisting,
         };
         let canonical = format!(
-            "{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{:?}",
+            "{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{:?}|{:?}",
             name.value,
             image.repository,
             image.digest,
@@ -82,6 +87,7 @@ impl DesiredStateModule for DesiredStateBuilder {
             package_fingerprint(&packages),
             config.network,
             grants,
+            mounts,
         );
         let hash = SpecHash {
             lowercase_hex: digest(&canonical),

@@ -25,6 +25,7 @@ RUN mkdir -p /etc/nix \
 # The workload runs as the host UID/GID, so the development image uses a
 # writable single-user Nix store instead of requiring a daemon inside PID 1.
 RUN chmod -R a+rwX /nix
+RUN mkdir -p /var/lib/spawnbx/nix
 
 ENV HOME=/home/spawnbx
 WORKDIR /workspace

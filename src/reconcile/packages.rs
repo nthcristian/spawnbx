@@ -26,7 +26,7 @@ impl PackagesModule for PackagePlanner {
             generated_metadata: paths.nix_dir.join("flake.nix"),
             lock_path: paths.lock_path.clone(),
             profile_path: paths.home_dir.join(".spawnbx-profile"),
-            container_flake_dir: "/workspace/.spawnbx/nix".to_owned(),
+            container_flake_dir: "/var/lib/spawnbx/nix".to_owned(),
             container_profile_path: "/home/spawnbx/.spawnbx-profile".to_owned(),
             flake_contents: flake_contents(intent),
             lock_policy: intent.lock_policy.clone(),
