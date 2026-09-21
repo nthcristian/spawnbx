@@ -27,6 +27,10 @@ impl TerminalAdapter for OsTerminalAdapter {
         target: &WorkloadHandle,
         shell: &ShellName,
     ) -> Result<AttachmentOutcome, AdapterError> {
+        eprintln!(
+            "spawnbx: attaching {} shell as uid {} gid {}",
+            shell.executable, target.identity.uid, target.identity.gid
+        );
         let status = self.process.attach(ProcessCommand {
             executable: "docker".into(),
             arguments: vec![
@@ -38,6 +42,7 @@ impl TerminalAdapter for OsTerminalAdapter {
                 shell.executable.clone().into(),
             ],
         })?;
+        eprintln!("spawnbx: attach process exited with {status}");
         Ok(AttachmentOutcome::Interactive(status))
     }
 }

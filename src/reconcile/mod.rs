@@ -21,10 +21,20 @@ pub(crate) fn run(invocation: Invocation, adapters: &mut Adapters<'_>) -> Reconc
     let project = project_module
         .resolve(invocation.cwd.clone(), adapters.workspace, create_state)
         .map_err(|error| ReconcileError::Configuration(diagnostic(error.message)))?;
+    eprintln!(
+        "spawnbx: project root {}",
+        project.root.canonical_path.display()
+    );
     let effective = project_module
         .merge(project.config.clone(), &invocation)
         .map_err(|error| ReconcileError::Configuration(diagnostic(error.message)))?;
+    eprintln!(
+        "spawnbx: desired shell '{}' with {} configured package(s)",
+        effective.shell.executable,
+        effective.packages.values.len()
+    );
     if invocation.save {
+        eprintln!("spawnbx: saving merged project configuration");
         project_module
             .save(&project.root, &effective, adapters.workspace)
             .map_err(|error| ReconcileError::Configuration(diagnostic(error.message)))?;
@@ -45,11 +55,16 @@ pub(crate) fn run(invocation: Invocation, adapters: &mut Adapters<'_>) -> Reconc
             },
         )
         .map_err(|error| ReconcileError::Preflight(error.diagnostics))?;
+    eprintln!("spawnbx: preflight checks passed");
 
     let mut desired_builder = DesiredStateBuilder::new();
     let mut desired = desired_builder
         .build(&project, &effective, &facts, &preflight.effective_grants)
         .map_err(|error| ReconcileError::Configuration(diagnostic(error.message)))?;
+    eprintln!(
+        "spawnbx: desired container '{}' using image '{}'",
+        desired.container.name.value, desired.container.image.repository
+    );
 
     let update_package = match &invocation.operation {
         Operation::Update { package } => package.clone(),
@@ -59,6 +74,7 @@ pub(crate) fn run(invocation: Invocation, adapters: &mut Adapters<'_>) -> Reconc
 
     match invocation.operation {
         Operation::Doctor => {
+            eprintln!("spawnbx: checking published image availability");
             adapters
                 .workload
                 .ensure_image(&desired.container.image)
@@ -97,6 +113,7 @@ pub(crate) fn run(invocation: Invocation, adapters: &mut Adapters<'_>) -> Reconc
                 _ => unreachable!(),
             };
             let action = container_action(&transition);
+            eprintln!("spawnbx: container action {}", transition_name(&transition));
             adapters
                 .workload
                 .apply(&transition, &desired)
@@ -143,6 +160,7 @@ pub(crate) fn run(invocation: Invocation, adapters: &mut Adapters<'_>) -> Reconc
                 ))));
             }
             let action = container_action(&transition);
+            eprintln!("spawnbx: container action {}", transition_name(&transition));
             let handle = adapters
                 .workload
                 .apply(&transition, &desired)
@@ -178,6 +196,7 @@ pub(crate) fn run(invocation: Invocation, adapters: &mut Adapters<'_>) -> Reconc
                 .map_err(|error| ReconcileError::Nix(diagnostic(error.message)))?;
 
             let attachment = if entering {
+                eprintln!("spawnbx: validating shell '{}'", effective.shell.executable);
                 let shell_check = adapters
                     .workload
                     .exec(
@@ -201,6 +220,7 @@ pub(crate) fn run(invocation: Invocation, adapters: &mut Adapters<'_>) -> Reconc
                     .terminal
                     .attach(&handle, &effective.shell)
                     .map_err(|error| ReconcileError::Attach(diagnostic(error.message)));
+                eprintln!("spawnbx: interactive shell exited");
                 adapters
                     .workload
                     .apply(&Transition::Stop, &desired)
@@ -228,6 +248,19 @@ fn container_action(transition: &Transition) -> ContainerAction {
         Transition::Stop => ContainerAction::Stopped,
         Transition::Remove => ContainerAction::Removed,
         Transition::Collision | Transition::Noop => ContainerAction::Checked,
+    }
+}
+
+fn transition_name(transition: &Transition) -> &'static str {
+    match transition {
+        Transition::Create => "create",
+        Transition::Reuse => "reuse running",
+        Transition::Start => "start stopped",
+        Transition::Recreate => "recreate",
+        Transition::Stop => "stop",
+        Transition::Remove => "remove",
+        Transition::Collision => "collision",
+        Transition::Noop => "noop",
     }
 }
 

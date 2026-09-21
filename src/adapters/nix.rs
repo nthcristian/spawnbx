@@ -28,17 +28,23 @@ impl PackageAdapter for NixCliAdapter {
     ) -> Result<NixReport, AdapterError> {
         let lock_existed = plan.lock_path.exists();
         if plan.lock_policy.is_advance() {
+            eprintln!("spawnbx: updating Nix lock input");
             require_success(
                 executor.exec(target, flake_command("update", &plan.container_flake_dir))?,
                 "nix flake update",
             )?;
         } else if !plan.lock_path.exists() {
+            eprintln!("spawnbx: creating Nix lock file");
             require_success(
                 executor.exec(target, flake_command("lock", &plan.container_flake_dir))?,
                 "nix flake lock",
             )?;
         }
 
+        eprintln!(
+            "spawnbx: installing Nix packages into {}",
+            plan.container_profile_path
+        );
         require_success(
             executor.exec(
                 target,
@@ -57,6 +63,7 @@ impl PackageAdapter for NixCliAdapter {
             )?,
             "nix build",
         )?;
+        eprintln!("spawnbx: Nix package profile is ready");
 
         Ok(NixReport {
             lock_changed: plan.lock_policy.is_advance() || !lock_existed,

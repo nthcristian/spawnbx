@@ -29,9 +29,15 @@ impl FakeWorkloadAdapter {
 impl WorkloadAdapter for DockerCliAdapter {
     fn ensure_image(&mut self, image: &ImageRef) -> Result<(), AdapterError> {
         let reference = image_reference(image);
+        eprintln!("spawnbx: ensuring image {reference}");
         if image.digest.is_empty() && image.repository.contains('/') {
+            eprintln!("spawnbx: pulling latest image {reference}");
             let output = self.run(vec!["pull".into(), reference.into()])?;
-            return require_success(output, "docker image pull");
+            let result = require_success(output, "docker image pull");
+            if result.is_ok() {
+                eprintln!("spawnbx: image pull complete");
+            }
+            return result;
         }
         let inspect = self.run(vec![
             "image".into(),
@@ -39,10 +45,16 @@ impl WorkloadAdapter for DockerCliAdapter {
             reference.clone().into(),
         ]);
         if inspect.as_ref().is_ok_and(|output| output.status.success()) {
+            eprintln!("spawnbx: image already available locally");
             return Ok(());
         }
+        eprintln!("spawnbx: image is not local; pulling {reference}");
         let output = self.run(vec!["pull".into(), reference.into()])?;
-        require_success(output, "docker image pull")
+        let result = require_success(output, "docker image pull");
+        if result.is_ok() {
+            eprintln!("spawnbx: image pull complete");
+        }
+        result
     }
 
     fn observe(&mut self, name: &ContainerName) -> Result<Option<Observation>, AdapterError> {
@@ -116,28 +128,38 @@ impl WorkloadAdapter for DockerCliAdapter {
         let name = &desired.container.name.value;
         match transition {
             Transition::Create => {
+                eprintln!("spawnbx: creating Docker container {name}");
                 self.create(desired)?;
                 self.start(name)?;
                 self.bootstrap_user(name, &desired.container.identity)?;
             }
             Transition::Recreate => {
+                eprintln!("spawnbx: removing container {name} before recreation");
                 require_success(
                     self.run(vec!["rm".into(), "-f".into(), name.clone().into()])?,
                     "docker remove before recreate",
                 )?;
+                eprintln!("spawnbx: creating replacement container {name}");
                 self.create(desired)?;
                 self.start(name)?;
                 self.bootstrap_user(name, &desired.container.identity)?;
             }
-            Transition::Start => self.start(name)?,
-            Transition::Reuse | Transition::Noop => {}
+            Transition::Start => {
+                eprintln!("spawnbx: starting stopped container {name}");
+                self.start(name)?;
+            }
+            Transition::Reuse | Transition::Noop => {
+                eprintln!("spawnbx: reusing running container {name}");
+            }
             Transition::Stop => {
+                eprintln!("spawnbx: stopping container {name}");
                 require_success(
                     self.run(vec!["stop".into(), name.clone().into()])?,
                     "docker stop",
                 )?;
             }
             Transition::Remove => {
+                eprintln!("spawnbx: removing container {name}");
                 require_success(
                     self.run(vec!["rm".into(), "-f".into(), name.clone().into()])?,
                     "docker remove",
@@ -193,6 +215,10 @@ impl WorkloadAdapter for DockerCliAdapter {
                 ),
             });
         }
+        eprintln!(
+            "spawnbx: validated container user {} (uid {}, gid {})",
+            identity.username, identity.uid, identity.gid
+        );
         Ok(())
     }
 
@@ -289,6 +315,10 @@ impl DockerCliAdapter {
     }
 
     fn bootstrap_user(&mut self, name: &str, identity: &HostIdentity) -> Result<(), AdapterError> {
+        eprintln!(
+            "spawnbx: configuring container user {} (uid {}, gid {})",
+            identity.username, identity.uid, identity.gid
+        );
         let output = self.run(vec![
             "exec".into(),
             name.to_owned().into(),
@@ -301,7 +331,11 @@ impl DockerCliAdapter {
             identity.gid.to_string().into(),
             identity.username.clone().into(),
         ])?;
-        require_success(output, "create container user")
+        let result = require_success(output, "create container user");
+        if result.is_ok() {
+            eprintln!("spawnbx: container user configuration complete");
+        }
+        result
     }
 
     fn exec_as_root(
