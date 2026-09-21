@@ -119,7 +119,8 @@ impl DesiredStateModule for DesiredStateBuilder {
 }
 
 fn image_ref() -> Result<ImageRef, DesiredStateError> {
-    let reference = std::env::var("SPAWNBX_IMAGE").unwrap_or_else(|_| "spawnbx:dev".to_owned());
+    let reference = std::env::var("SPAWNBX_IMAGE")
+        .unwrap_or_else(|_| "ghcr.io/nthcristian/spawnbx:latest".to_owned());
     let (repository, digest) = reference
         .split_once('@')
         .map(|(repository, digest)| (repository.to_owned(), digest.to_owned()))

@@ -1,0 +1,25 @@
+{
+  "name": "spawnbx",
+  "version": "0.1.0",
+  "description": "Linux development workspace containers backed by Docker and Nix",
+  "bin": {
+    "spawnbx": "bin/spawnbx"
+  },
+  "files": [
+    "bin/spawnbx"
+  ],
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nthcristian/spawnbx.git"
+  },
+  "license": "MIT"
+}

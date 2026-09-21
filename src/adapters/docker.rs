@@ -29,6 +29,10 @@ impl FakeWorkloadAdapter {
 impl WorkloadAdapter for DockerCliAdapter {
     fn ensure_image(&mut self, image: &ImageRef) -> Result<(), AdapterError> {
         let reference = image_reference(image);
+        if image.digest.is_empty() && image.repository.contains('/') {
+            let output = self.run(vec!["pull".into(), reference.into()])?;
+            return require_success(output, "docker image pull");
+        }
         let inspect = self.run(vec![
             "image".into(),
             "inspect".into(),
