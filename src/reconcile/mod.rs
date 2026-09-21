@@ -35,7 +35,7 @@ pub(crate) fn run(invocation: Invocation, adapters: &mut Adapters<'_>) -> Reconc
         .facts()
         .map_err(|error| ReconcileError::Preflight(vec![diagnostic(error.message)]))?;
     let mut preflight = PreflightEvaluator::new();
-    let preflight = preflight
+    let mut preflight = preflight
         .evaluate(
             &effective,
             &facts,
@@ -148,6 +148,18 @@ pub(crate) fn run(invocation: Invocation, adapters: &mut Adapters<'_>) -> Reconc
                 .apply(&transition, &desired)
                 .map_err(|error| ReconcileError::Container(diagnostic(error.message)))?;
 
+            let entering = matches!(invocation.operation, Operation::Attach);
+            if entering {
+                adapters
+                    .workload
+                    .validate_user(&handle, &facts.identity)
+                    .map_err(|error| ReconcileError::Attach(diagnostic(error.message)))?;
+                for warning in &preflight.warnings {
+                    eprintln!("warning: {}", warning.message);
+                }
+                preflight.warnings.clear();
+            }
+
             let mut package_planner = PackagePlanner::new();
             let mut package_plan = package_planner
                 .plan(&desired.packages, &project.state_paths)
@@ -165,7 +177,7 @@ pub(crate) fn run(invocation: Invocation, adapters: &mut Adapters<'_>) -> Reconc
                 .reconcile(&package_plan, &handle, adapters.workload)
                 .map_err(|error| ReconcileError::Nix(diagnostic(error.message)))?;
 
-            let attachment = if matches!(invocation.operation, Operation::Attach) {
+            let attachment = if entering {
                 let shell_check = adapters
                     .workload
                     .exec(
@@ -185,10 +197,15 @@ pub(crate) fn run(invocation: Invocation, adapters: &mut Adapters<'_>) -> Reconc
                         effective.shell.executable
                     ))));
                 }
-                adapters
+                let attachment = adapters
                     .terminal
                     .attach(&handle, &effective.shell)
-                    .map_err(|error| ReconcileError::Attach(diagnostic(error.message)))?
+                    .map_err(|error| ReconcileError::Attach(diagnostic(error.message)));
+                adapters
+                    .workload
+                    .apply(&Transition::Stop, &desired)
+                    .map_err(|error| ReconcileError::Container(diagnostic(error.message)))?;
+                attachment?
             } else {
                 AttachmentOutcome::Skipped
             };

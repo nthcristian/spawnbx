@@ -226,6 +226,7 @@ pub(crate) struct ImageRef {
 
 #[derive(Clone, Debug)]
 pub(crate) struct HostIdentity {
+    pub(crate) username: String,
     pub(crate) uid: u32,
     pub(crate) gid: u32,
     pub(crate) supplementary_groups: Vec<u32>,
@@ -363,6 +364,7 @@ pub(crate) struct Diagnostic {
 #[derive(Debug)]
 pub(crate) struct WorkloadHandle {
     pub(crate) opaque_id: String,
+    pub(crate) identity: HostIdentity,
 }
 
 #[derive(Clone, Debug)]

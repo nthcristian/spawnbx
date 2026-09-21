@@ -1,8 +1,9 @@
 use std::ffi::OsString;
 
 use crate::reconcile::{
-    AdapterError, ContainerName, DesiredState, DeviceGrant, ImageRef, Mount, Observation,
-    ProcessAdapter, ProcessCommand, ProcessOutput, Transition, WorkloadAdapter, WorkloadHandle,
+    AdapterError, ContainerName, DesiredState, DeviceGrant, HostIdentity, ImageRef, Mount,
+    Observation, ProcessAdapter, ProcessCommand, ProcessOutput, Transition, WorkloadAdapter,
+    WorkloadHandle,
 };
 
 pub(crate) struct DockerCliAdapter {
@@ -113,6 +114,7 @@ impl WorkloadAdapter for DockerCliAdapter {
             Transition::Create => {
                 self.create(desired)?;
                 self.start(name)?;
+                self.bootstrap_user(name, &desired.container.identity)?;
             }
             Transition::Recreate => {
                 require_success(
@@ -121,6 +123,7 @@ impl WorkloadAdapter for DockerCliAdapter {
                 )?;
                 self.create(desired)?;
                 self.start(name)?;
+                self.bootstrap_user(name, &desired.container.identity)?;
             }
             Transition::Start => self.start(name)?,
             Transition::Reuse | Transition::Noop => {}
@@ -145,7 +148,48 @@ impl WorkloadAdapter for DockerCliAdapter {
         }
         Ok(WorkloadHandle {
             opaque_id: name.clone(),
+            identity: desired.container.identity.clone(),
         })
+    }
+
+    fn validate_user(
+        &mut self,
+        target: &WorkloadHandle,
+        identity: &HostIdentity,
+    ) -> Result<(), AdapterError> {
+        let uid = self.exec_as_root(
+            target,
+            ProcessCommand {
+                executable: "id".into(),
+                arguments: vec!["-u".into(), identity.username.clone().into()],
+            },
+        )?;
+        let gid = self.exec_as_root(
+            target,
+            ProcessCommand {
+                executable: "id".into(),
+                arguments: vec!["-g".into(), identity.username.clone().into()],
+            },
+        )?;
+        if !uid.status.success() || uid.stdout.trim() != identity.uid.to_string() {
+            return Err(AdapterError {
+                category: "identity".to_owned(),
+                message: format!(
+                    "container user {} does not have UID {}",
+                    identity.username, identity.uid
+                ),
+            });
+        }
+        if !gid.status.success() || gid.stdout.trim() != identity.gid.to_string() {
+            return Err(AdapterError {
+                category: "identity".to_owned(),
+                message: format!(
+                    "container user {} does not have GID {}",
+                    identity.username, identity.gid
+                ),
+            });
+        }
+        Ok(())
     }
 
     fn exec(
@@ -155,6 +199,8 @@ impl WorkloadAdapter for DockerCliAdapter {
     ) -> Result<ProcessOutput, AdapterError> {
         let mut arguments = vec![
             "exec".into(),
+            "--user".into(),
+            format!("{}:{}", target.identity.uid, target.identity.gid).into(),
             target.opaque_id.clone().into(),
             command.executable,
         ];
@@ -173,7 +219,7 @@ impl DockerCliAdapter {
             "--workdir".into(),
             "/workspace".into(),
             "--user".into(),
-            format!("{}:{}", spec.identity.uid, spec.identity.gid).into(),
+            "0:0".into(),
             "--env".into(),
             "HOME=/home/spawnbx".into(),
             "--env".into(),
@@ -237,6 +283,33 @@ impl DockerCliAdapter {
             arguments,
         })
     }
+
+    fn bootstrap_user(&mut self, name: &str, identity: &HostIdentity) -> Result<(), AdapterError> {
+        let output = self.run(vec![
+            "exec".into(),
+            name.to_owned().into(),
+            "sh".into(),
+            "-eu".into(),
+            "-c".into(),
+            bootstrap_script().into(),
+            "--".into(),
+            identity.uid.to_string().into(),
+            identity.gid.to_string().into(),
+            identity.username.clone().into(),
+        ])?;
+        require_success(output, "create container user")
+    }
+
+    fn exec_as_root(
+        &mut self,
+        target: &WorkloadHandle,
+        command: ProcessCommand,
+    ) -> Result<ProcessOutput, AdapterError> {
+        let mut arguments = vec!["exec".into(), target.opaque_id.clone().into()];
+        arguments.push(command.executable);
+        arguments.extend(command.arguments);
+        self.run(arguments)
+    }
 }
 
 impl WorkloadAdapter for FakeWorkloadAdapter {
@@ -259,7 +332,16 @@ impl WorkloadAdapter for FakeWorkloadAdapter {
     ) -> Result<WorkloadHandle, AdapterError> {
         Ok(WorkloadHandle {
             opaque_id: desired.container.name.value.clone(),
+            identity: desired.container.identity.clone(),
         })
+    }
+
+    fn validate_user(
+        &mut self,
+        _target: &WorkloadHandle,
+        _identity: &HostIdentity,
+    ) -> Result<(), AdapterError> {
+        Ok(())
     }
 
     fn exec(
@@ -321,4 +403,46 @@ fn require_success(output: ProcessOutput, operation: &str) -> Result<(), Adapter
         category: "docker-command".to_owned(),
         message: format!("{operation}: {}", output.stderr.trim()),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::bootstrap_script;
+
+    #[test]
+    fn bootstrap_creates_a_sudo_enabled_user() {
+        let script = bootstrap_script();
+
+        assert!(script.contains("useradd --uid"));
+        assert!(script.contains("usermod --append --groups wheel"));
+        assert!(script.contains("NOPASSWD: ALL"));
+    }
+}
+
+fn bootstrap_script() -> &'static str {
+    r#"
+uid="$1"
+gid="$2"
+username="$3"
+
+existing_uid="$(id -u "$username" 2>/dev/null || true)"
+if [ -n "$existing_uid" ] && [ "$existing_uid" != "$uid" ]; then
+    printf 'username %s already exists with UID %s\n' "$username" "$existing_uid" >&2
+    exit 1
+fi
+
+if ! getent group "$gid" >/dev/null; then
+    groupadd --gid "$gid" "$username"
+fi
+if [ -z "$existing_uid" ]; then
+    useradd --uid "$uid" --gid "$gid" --home-dir /home/spawnbx \
+        --create-home --shell /bin/bash "$username"
+fi
+
+usermod --gid "$gid" "$username"
+usermod --append --groups wheel "$username"
+printf '%s ALL=(ALL) NOPASSWD: ALL\n' "$username" > /etc/sudoers.d/spawnbx
+chmod 0440 /etc/sudoers.d/spawnbx
+chown --recursive "$uid:$gid" /home/spawnbx
+"#
 }

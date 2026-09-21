@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
 use super::types::{
-    AttachmentOutcome, ContainerName, DesiredState, HostFacts, ImageRef, NixReport, Observation,
-    PackagePlan, ProcessCommand, ProcessOutput, ProjectConfig, ProjectRoot, ShellName, StatePaths,
-    Transition, WorkloadHandle,
+    AttachmentOutcome, ContainerName, DesiredState, HostFacts, HostIdentity, ImageRef, NixReport,
+    Observation, PackagePlan, ProcessCommand, ProcessOutput, ProjectConfig, ProjectRoot, ShellName,
+    StatePaths, Transition, WorkloadHandle,
 };
 
 pub(crate) struct Adapters<'a> {
@@ -48,6 +48,12 @@ pub(crate) trait WorkloadAdapter {
         transition: &Transition,
         desired: &DesiredState,
     ) -> Result<WorkloadHandle, AdapterError>;
+
+    fn validate_user(
+        &mut self,
+        target: &WorkloadHandle,
+        identity: &HostIdentity,
+    ) -> Result<(), AdapterError>;
 
     fn exec(
         &mut self,

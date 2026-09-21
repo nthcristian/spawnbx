@@ -71,10 +71,11 @@ impl DesiredStateModule for DesiredStateBuilder {
             lock_policy: super::types::LockPolicy::RespectExisting,
         };
         let canonical = format!(
-            "{}|{}|{}|{}|{}|{}|{}|{:?}|{:?}",
+            "{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{:?}",
             name.value,
             image.repository,
             image.digest,
+            facts.identity.username,
             facts.identity.uid,
             facts.identity.gid,
             config.shell.executable,

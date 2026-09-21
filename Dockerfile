@@ -13,6 +13,7 @@ RUN pacman -Syu --noconfirm \
         man-pages \
         nix=2.35.2-2 \
         shadow \
+        sudo \
     && pacman -Scc --noconfirm
 
 RUN mkdir -p /etc/nix \

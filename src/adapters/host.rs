@@ -90,6 +90,13 @@ impl HostAdapter for FakeHostAdapter {
 fn host_identity() -> Result<HostIdentity, AdapterError> {
     let uid = id_value("-u")?;
     let gid = id_value("-g")?;
+    let username = id_output("-un")?.trim().to_owned();
+    if username.is_empty() {
+        return Err(AdapterError {
+            category: "identity".to_owned(),
+            message: "host username is empty".to_owned(),
+        });
+    }
     let groups = id_output("-G")?
         .split_whitespace()
         .map(|value| {
@@ -100,6 +107,7 @@ fn host_identity() -> Result<HostIdentity, AdapterError> {
         })
         .collect::<Result<Vec<_>, _>>()?;
     Ok(HostIdentity {
+        username,
         uid,
         gid,
         supplementary_groups: groups,

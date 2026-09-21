@@ -31,6 +31,8 @@ impl TerminalAdapter for OsTerminalAdapter {
             executable: "docker".into(),
             arguments: vec![
                 "exec".into(),
+                "--user".into(),
+                format!("{}:{}", target.identity.uid, target.identity.gid).into(),
                 "-it".into(),
                 target.opaque_id.clone().into(),
                 shell.executable.clone().into(),
