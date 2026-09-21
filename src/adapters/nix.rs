@@ -46,6 +46,7 @@ impl PackageAdapter for NixCliAdapter {
                     executable: "nix".into(),
                     arguments: vec![
                         "build".into(),
+                        "--no-link".into(),
                         "--no-update-lock-file".into(),
                         "--profile".into(),
                         plan.container_profile_path.clone().into(),
