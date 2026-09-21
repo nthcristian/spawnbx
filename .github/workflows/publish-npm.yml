@@ -9,6 +9,10 @@ permissions:
   contents: read
   id-token: write
 
+concurrency:
+  group: npm-publish-main
+  cancel-in-progress: false
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -27,15 +31,20 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Update package version
+        run: |
+          set -eu
+          current_version="$(npm view spawnbx version)"
+          npm version "$current_version" --no-git-tag-version
+          npm version patch --no-git-tag-version
+          node -p '"Publishing spawnbx@" + require("./package.json").version'
+
       - name: Build binary
         run: cargo build --locked --release
 
       - name: Prepare npm package
-        env:
-          RUN_NUMBER: ${{ github.run_number }}
         run: |
           set -eu
-          npm version "$(node -p "require('./package.json').version")-main.${RUN_NUMBER}" --no-git-tag-version
           mkdir -p bin
           cp target/release/spawnbx bin/spawnbx
           chmod 755 bin/spawnbx
@@ -44,4 +53,4 @@ jobs:
         run: npm pack --dry-run
 
       - name: Publish to npm
-        run: npm publish --provenance --access public --tag latest
+        run: npm publish --provenance --access public
