@@ -1,12 +1,12 @@
 use crate::{
-    contracts::EnvironmentPlugin,
+    contracts::{EnvironmentPlugin, PluginError},
     model::{DesiredContainerState, Executor},
 };
 
 pub struct UserPlugin {}
 
 impl EnvironmentPlugin for UserPlugin {
-    fn plug(executor: &Executor, desired_state: &DesiredContainerState) {
+    fn plug(executor: &Executor, desired_state: &DesiredContainerState) -> Result<(), PluginError> {
         let uid = desired_state.host_uid.to_string();
         let gid = desired_state.host_gid.to_string();
         let output = executor(&[
@@ -36,14 +36,15 @@ useradd --uid "$uid" --gid "$gid" --home-dir /home/spawnbx \
             &uid,
             &gid,
         ])
-        .unwrap_or_else(|error| panic!("failed to configure container user: {error}"));
+        .map_err(|source| PluginError::RuntimeError { source })?;
 
-        assert_eq!(
-            output.exit_code,
-            Some(0),
-            "failed to configure container user: {}",
-            output.stderr
-        );
+        if output.exit_code == Some(0) {
+            Ok(())
+        } else {
+            Err(PluginError::RuntimeError {
+                source: anyhow::anyhow!("failed to configure container user: {}", output.stderr),
+            })
+        }
     }
 }
 
