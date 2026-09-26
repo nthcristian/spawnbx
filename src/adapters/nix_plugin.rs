@@ -8,11 +8,26 @@ use crate::{
 };
 
 const SYSTEM_PROFILE: &str = "/nix/var/nix/profiles/default";
+const SYSTEM_PATH_SCRIPT: &str = r#"
+mkdir -p /etc/profile.d
+cat > /etc/profile.d/spawnbx-nix.sh <<'EOF'
+case ":$PATH:" in
+    *":/nix/var/nix/profiles/default/bin:"*) ;;
+    *) export PATH="/nix/var/nix/profiles/default/bin:$PATH" ;;
+esac
+EOF
+chmod 0644 /etc/profile.d/spawnbx-nix.sh
+"#;
 
 pub struct NixPlugin {}
 
 impl EnvironmentPlugin for NixPlugin {
     fn plug(executor: &Executor, desired_state: &DesiredContainerState) -> Result<(), PluginError> {
+        execute(
+            executor,
+            &["sh", "-eu", "-c", SYSTEM_PATH_SCRIPT],
+            "configure the system Nix PATH",
+        )?;
         let installed = installed_packages(execute(
             executor,
             &[
