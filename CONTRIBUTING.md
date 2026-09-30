@@ -22,7 +22,8 @@ Run these checks for Rust changes:
 ```sh
 cargo fmt --check
 cargo check --locked
-cargo test
+cargo test --locked
+cargo clippy --locked --all-targets -- -D warnings
 cargo build --locked --release
 ```
 
@@ -33,6 +34,27 @@ docker build --platform linux/amd64 -t spawnbx:local .
 ```
 
 The published workflows also validate the npm package and create a container from the pushed GHCR image.
+
+### Opt-In Runtime Tests
+
+Default tests are isolated; real Docker/Nix tests are ignored. To compile them without executing:
+
+```sh
+cargo test --locked --test runtime --no-run
+```
+
+Runtime tests require a non-root host user with nonzero UID/GID, a reachable local Docker daemon with matching bind-mount ownership (not a remote daemon or remapped/rootless setup), and an existing debug image tagged `spawnbx:latest`. The image is Linux/amd64; other hosts need compatible emulation. Prepare it explicitly if needed:
+
+```sh
+docker build --platform linux/amd64 -t spawnbx:latest .
+cargo test --locked --test runtime -- --ignored --test-threads=1
+```
+
+Tests never build or pull images, and missing prerequisites fail rather than silently skip. The Nix test installs the small `nixpkgs#hello` package, requiring registry/network access or sufficient cached inputs; use a baseline image without `hello` already installed. Do not use `--release`, which selects the published image instead.
+
+Coverage includes create/reuse/restart/remove, repeated user setup, mapped UID/GID execution and persisted home ownership, and Nix installation with an unchanged profile/generation on repeat. Tests use uniquely named `spawnbx-runtime-*` containers and temporary workspaces/homes, never repository containers or the host home. An independent guard checks the exact name is unused before owning it, retains the workspace through cleanup, and removes the test container even after production Drop stops it. Abrupt process termination or daemon/cleanup failures can still leave disposable resources; remove only the exact test-owned resources reported.
+
+Runtime failures in the unchanged user/group scripts remain failures. Interactive attach, the existing attach/stop `todo!()` panic, and the invalid literal quoted update-all argument `'.*'` are not successful runtime workflows and remain preserved limitations. These tests do not establish lock-file reproducibility.
 
 ## Generated Files
 

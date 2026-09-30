@@ -1,68 +1,31 @@
 # spawnbx
 
-`spawnbx` creates and manages a project development container backed by Docker and Nix. It mounts the current project, matches the host user's numeric UID/GID, persists the container user's home under `.spawnbx/`, and attaches an interactive shell.
+[![npm](https://img.shields.io/npm/v/spawnbx?logo=npm)](https://www.npmjs.com/package/spawnbx)
+[![GHCR](https://img.shields.io/badge/ghcr.io%2Fnthcristian%2Fspawnbx-latest-2496ed?logo=github)](https://github.com/nthcristian/spawnbx/pkgs/container/spawnbx)
 
-The current MVP supports Linux `amd64` hosts and Docker.
+`spawnbx` runs a project-local Docker development environment with a Nix system profile. It bind-mounts the project at `/workspace`, creates a container user with the host UID/GID, and stores that user's home at `.spawnbx/home`.
+
+## Status
+
+Desktop and host integrations are currently unavailable. X11, Wayland, PipeWire, GPU, network, and `--allow-missing-integrations` options are not implemented and are rejected by the CLI.
 
 ## Requirements
 
-- Linux `x86_64` host
-- Docker installed and running
-- Access to the published image at `ghcr.io/nthcristian/spawnbx:latest`
+- Linux x64
+- Docker CLI and daemon
+- A `.spawnbx.yml` file in the project directory
 
-The first run pulls the image. The image contains Arch Linux, Bash, common development tools, Nix, and the runtime setup used by `spawnbx`.
-
-## Install
-
-Install the published CLI from npm:
+Install the published CLI with:
 
 ```sh
 npm install --global spawnbx
 ```
 
-To build from source:
+Build from source with `cargo build --release`.
 
-```sh
-cargo build --release
-./target/release/spawnbx doctor
-```
+## Configure
 
-## Basic Use
-
-Run `spawnbx` from a project directory to reconcile its container and attach a shell:
-
-```sh
-cd path/to/project
-spawnbx
-```
-
-The container stops when the attached shell exits. Project files stay on the host, and `.spawnbx/home` preserves container-user state between runs.
-
-Useful commands:
-
-```sh
-spawnbx doctor              # Check host and image prerequisites
-spawnbx update              # Update the shared Nixpkgs lock input
-spawnbx update ripgrep      # Update and identify a package in the result
-spawnbx stop                # Stop the project container
-spawnbx remove              # Remove it while preserving project state
-```
-
-Common options:
-
-```sh
-spawnbx --shell fish
-spawnbx --packages fish,ripgrep
-spawnbx --x11 --wayland --pipewire --gpu
-spawnbx --network none
-spawnbx --save --shell fish --packages fish,ripgrep
-```
-
-Use `--allow-missing-integrations` when an optional desktop or GPU integration should become a warning instead of stopping the run.
-
-## Project Configuration
-
-Configuration is optional. Create `.spawnbx.yml` in the project root:
+`.spawnbx.yml` is required. Its fields are optional:
 
 ```yaml
 name: my-project
@@ -70,28 +33,29 @@ shell: fish
 packages:
   - fish
   - ripgrep
-x11: false
-wayland: false
-pipewire: false
-gpu: false
-network: bridge
 ```
 
-Command-line options override the configuration for the current invocation. Add `--save` to write the merged values back to `.spawnbx.yml`.
+`name` prefixes the Docker container name. `shell` defaults to `bash`; `packages` defaults to an empty list. Packages are installed with Nix into `/nix/var/nix/profiles/default`.
 
-Generated state is kept under `.spawnbx/` and should not be committed. The default image can be overridden for local testing:
+## Commands
+
+Run commands from the directory containing `.spawnbx.yml`.
+
+| Command                        | Current behavior                                                                                                                                                            |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `spawnbx`                      | Creates or starts the environment, configures the user and Nix packages, then attaches the configured shell.                                                                |
+| `spawnbx update [packages...]` | Configures the environment, requests Nix upgrades for all installed packages or the named installed packages, reconciles configured packages, then exits without attaching. |
+| `spawnbx stop`                 | Stops the derived project container and exits.                                                                                                                              |
+| `spawnbx remove`               | Removes the derived project container; `.spawnbx/home` remains.                                                                                                             |
+| `spawnbx recreate`             | Removes the container, creates or starts it again, configures it, then attaches.                                                                                            |
+
+Example usage:
 
 ```sh
-SPAWNBX_IMAGE=ghcr.io/nthcristian/spawnbx:latest spawnbx doctor
+spawnbx --shell fish --packages fish,ripgrep
+spawnbx --save --shell fish --packages fish,ripgrep
 ```
 
-## Limitations
+`--shell` overrides the attached shell for the invocation. `--packages` adds comma-separated package names to the project configuration for the invocation. `--save` writes the merged name, shell, and package list back to `.spawnbx.yml` before Docker work begins.
 
-- The MVP supports Docker and Linux `amd64` only.
-- Project packages are installed with Nix, not pacman.
-- X11, Wayland, PipeWire, and GPU access are opt-in.
-- The project directory is trusted code and is mounted into the workload.
-
-## License
-
-spawnbx is distributed under the GNU General Public License v3.
+Progress logs use `RUST_LOG`; normal runs default to INFO and `RUST_LOG=off` suppresses them.

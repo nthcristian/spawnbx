@@ -1,0 +1,17 @@
+# Changelog
+
+## Unreleased
+
+### Changed
+
+- Reworked the CLI around explicit environment runtime, configuration, state-store, and invocation-parser contracts.
+- Added Docker lifecycle, user setup, and Nix profile configuration through concrete adapters.
+- Added project settings for the container name, shell, and Nix packages.
+
+### Testing
+
+- Added isolated unit and CLI tests plus opt-in Docker/Nix runtime tests.
+
+### Documentation
+
+- Documented the implemented commands and the current lack of desktop and host integrations.
