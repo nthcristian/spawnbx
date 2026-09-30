@@ -1,22 +1,31 @@
 use std::{
     fs,
     hash::{DefaultHasher, Hash, Hasher},
-    path::PathBuf,
+    path::Path,
     process::{Command, Output},
 };
 
+use anyhow::Context;
+
 use crate::{
-    contracts::{Environment, EnvironmentError},
-    model::DesiredContainerState,
+    contracts::{EnvironmentRuntime, EnvironmentRuntimeError},
+    model::{CommandExecutor, CommandOutput, EnvironmentState},
 };
 
-pub struct Docker {
-    desired_state: DesiredContainerState,
-    fullname: String,
+#[cfg(not(debug_assertions))]
+const DEFAULT_IMAGE: &str = "ghcr.io/nthcristian/spawnbx:latest";
+
+#[cfg(debug_assertions)]
+const DEFAULT_IMAGE: &str = "spawnbx:latest";
+
+pub struct DockerEnvironment {
+    environment_state: EnvironmentState,
+    container_name: String,
 }
 
-impl Environment for Docker {
-    fn attach(&self) -> Result<(), EnvironmentError> {
+impl EnvironmentRuntime for DockerEnvironment {
+    fn attach(&self) -> Result<(), EnvironmentRuntimeError> {
+        tracing::info!(container = self.container_name(), "attaching to container");
         let status = Command::new("docker")
             .args([
                 "exec",
@@ -25,84 +34,129 @@ impl Environment for Docker {
                 "--user",
                 &format!(
                     "{}:{}",
-                    self.desired_state.host_uid, self.desired_state.host_gid
+                    self.environment_state.host_uid, self.environment_state.host_gid
                 ),
                 self.container_name(),
-                &self.desired_state.shell_program,
+                &self.environment_state.shell_program,
             ])
             .status()
-            .map_err(runtime_error)?;
+            .with_context(|| {
+                format!(
+                    "could not attach to Docker container {}",
+                    self.container_name()
+                )
+            })?;
 
         if status.success() {
             Ok(())
         } else {
-            Err(EnvironmentError::AttachError(format!(
-                "docker exec exited with {status}"
+            Err(EnvironmentRuntimeError::AttachmentFailed(format!(
+                "docker exec for {} exited with {status}",
+                self.container_name()
             )))
         }
     }
 
-    fn get_executor(
-        &self,
-    ) -> impl Fn(&[&str]) -> Result<crate::model::ExecutionOutput, EnvironmentError> + '_ {
-        move |command| {
-            let container_name = self.container_name();
+    fn executor(&self) -> CommandExecutor<'_> {
+        Box::new(move |command| {
             let output = Command::new("docker")
-                .args(["exec", container_name])
+                .args(["exec", self.container_name()])
                 .args(command)
                 .output()
-                .map_err(runtime_error)?;
+                .with_context(|| {
+                    format!(
+                        "could not execute in Docker container {}",
+                        self.container_name()
+                    )
+                })
+                .map_err(EnvironmentRuntimeError::from)?;
 
-            Ok(crate::model::ExecutionOutput {
-                stdout: String::from_utf8(output.stdout).map_err(runtime_error)?,
-                stderr: String::from_utf8(output.stderr).map_err(runtime_error)?,
+            Ok(CommandOutput {
+                stdout: String::from_utf8(output.stdout)
+                    .with_context(|| {
+                        format!(
+                            "could not decode stdout from Docker container {} as UTF-8",
+                            self.container_name()
+                        )
+                    })
+                    .map_err(EnvironmentRuntimeError::from)?,
+                stderr: String::from_utf8(output.stderr)
+                    .with_context(|| {
+                        format!(
+                            "could not decode stderr from Docker container {} as UTF-8",
+                            self.container_name()
+                        )
+                    })
+                    .map_err(EnvironmentRuntimeError::from)?,
                 exit_code: output.status.code(),
             })
-        }
-    }
-}
-
-impl Docker {
-    fn container_name(&self) -> &str {
-        &self.fullname
+        })
     }
 
-    fn ensure_running(&self) -> Result<(), EnvironmentError> {
-        let inspect = docker(&[
-            "container",
-            "inspect",
-            "--format",
-            "{{.State.Running}}",
-            self.container_name(),
-        ])?;
+    fn ensure_running(&self) -> Result<(), EnvironmentRuntimeError> {
+        let inspect = self.inspect()?;
+
+        // Keep this after a completed inspect, including a nonzero inspect result.
+        let home = Path::new(&self.environment_state.workspace_root).join(".spawnbx/home");
+        fs::create_dir_all(&home)
+            .with_context(|| format!("could not create home directory {}", home.display()))?;
 
         if inspect.status.success() {
             return if inspect.stdout.trim_ascii() == b"true" {
                 Ok(())
             } else {
-                docker_success(&["container", "start", self.container_name()], "start")
+                self.start()
             };
         }
 
         if !String::from_utf8_lossy(&inspect.stderr).contains("No such container") {
-            return Err(runtime_error(anyhow::anyhow!(
-                "could not inspect Docker container {}: {}",
+            return Err(anyhow::anyhow!(
+                "could not inspect Docker container {} ({}): {}",
                 self.container_name(),
+                inspect.status,
                 String::from_utf8_lossy(&inspect.stderr).trim()
-            )));
+            )
+            .into());
         }
 
-        let state_root = PathBuf::from(&self.desired_state.workspace_root).join(".spawnbx");
-        fs::create_dir_all(state_root.join("home")).map_err(runtime_error)?;
-        fs::create_dir_all(state_root.join("nix")).map_err(runtime_error)?;
+        self.create(&home)
+    }
 
-        let workspace_mount = format!("{}:/workspace", self.desired_state.workspace_root);
-        let home_mount = format!("{}:/home/spawnbx", state_root.join("home").display());
-        let nix_mount = format!(
-            "{}:/workspace/.spawnbx/nix",
-            state_root.join("nix").display()
-        );
-        docker_success(
+    fn remove(&self) -> Result<(), EnvironmentRuntimeError> {
+        tracing::info!(container = self.container_name(), "removing container");
+        self.run_docker_successfully(&["rm", self.container_name()], "remove")
+    }
+}
+
+impl DockerEnvironment {
+    pub fn container_name(&self) -> &str {
+        &self.container_name
+    }
+
+    fn inspect(&self) -> Result<Output, EnvironmentRuntimeError> {
+        self.run_docker(
+            &[
+                "container",
+                "inspect",
+                "--format",
+                "{{.State.Running}}",
+                self.container_name(),
+            ],
+            "inspect",
+        )
+    }
+
+    fn start(&self) -> Result<(), EnvironmentRuntimeError> {
+        tracing::info!(container = self.container_name(), "starting container");
+        self.run_docker_successfully(&["container", "start", self.container_name()], "start")
+    }
+
+    fn create(&self, home: &Path) -> Result<(), EnvironmentRuntimeError> {
+        tracing::info!(container = self.container_name(), "creating container");
+        let workspace_mount = format!("{}:/workspace", self.environment_state.workspace_root);
+        let home_mount = format!("{}:/home/spawnbx", home.display());
+
+        self.run_docker_successfully(
             &[
                 "run",
                 "--detach",
@@ -116,77 +170,87 @@ impl Docker {
                 &workspace_mount,
                 "--volume",
                 &home_mount,
-                "--volume",
-                &nix_mount,
-                "ghcr.io/nthcristian/spawnbx:latest",
+                DEFAULT_IMAGE,
                 "sleep",
                 "infinity",
             ],
             "create",
         )
     }
-}
 
-impl TryFrom<&DesiredContainerState> for Docker {
-    type Error = EnvironmentError;
+    fn run_docker(
+        &self,
+        args: &[&str],
+        operation: &str,
+    ) -> Result<Output, EnvironmentRuntimeError> {
+        Command::new("docker")
+            .args(args)
+            .output()
+            .with_context(|| {
+                format!(
+                    "could not {operation} Docker container {}",
+                    self.container_name()
+                )
+            })
+            .map_err(EnvironmentRuntimeError::from)
+    }
 
-    fn try_from(value: &DesiredContainerState) -> Result<Self, Self::Error> {
-        let hash = hash_string(value.workspace_root.clone())?;
-
-        let docker = Self {
-            desired_state: value.clone(),
-            fullname: format!("{}-{hash}", value.container_name_prefix),
-        };
-
-        docker.ensure_running()?;
-
-        Ok(docker)
+    fn run_docker_successfully(
+        &self,
+        args: &[&str],
+        operation: &str,
+    ) -> Result<(), EnvironmentRuntimeError> {
+        let output = self.run_docker(args, operation)?;
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!(
+                "could not {operation} Docker container {} ({}): {}",
+                self.container_name(),
+                output.status,
+                String::from_utf8_lossy(&output.stderr).trim()
+            )
+            .into())
+        }
     }
 }
 
-impl Drop for Docker {
+impl TryFrom<&EnvironmentState> for DockerEnvironment {
+    type Error = EnvironmentRuntimeError;
+
+    fn try_from(value: &EnvironmentState) -> Result<Self, Self::Error> {
+        Ok(Self {
+            environment_state: value.clone(),
+            container_name: format!(
+                "{}-{}",
+                value.container_name_prefix,
+                workspace_hash(&value.workspace_root)
+            ),
+        })
+    }
+}
+
+impl Drop for DockerEnvironment {
     fn drop(&mut self) {
-        let _ = Command::new("docker")
-            .args(["container", "stop", &self.fullname])
-            .output();
+        tracing::info!(container = self.container_name(), "stopping container");
+        if let Err(error) =
+            self.run_docker_successfully(&["container", "stop", self.container_name()], "stop")
+        {
+            tracing::debug!(container = self.container_name(), error = ?error, "ignoring container cleanup failure");
+        }
     }
 }
 
-fn runtime_error(source: impl Into<anyhow::Error>) -> EnvironmentError {
-    EnvironmentError::RuntimeError {
-        source: source.into(),
-    }
-}
-
-fn docker(args: &[&str]) -> Result<Output, EnvironmentError> {
-    Command::new("docker")
-        .args(args)
-        .output()
-        .map_err(runtime_error)
-}
-
-fn docker_success(args: &[&str], operation: &str) -> Result<(), EnvironmentError> {
-    let output = docker(args)?;
-
-    if output.status.success() {
-        Ok(())
-    } else {
-        Err(runtime_error(anyhow::anyhow!(
-            "could not {operation} Docker container: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        )))
-    }
-}
-
-fn hash_string(source: String) -> Result<String, EnvironmentError> {
+fn workspace_hash(source: &str) -> String {
     let mut hasher = DefaultHasher::new();
     source.hash(&mut hasher);
 
-    let v: Vec<String> = hasher.finish().to_be_bytes()[..4]
-        .to_vec()
+    hasher.finish().to_be_bytes()[..4]
         .iter()
         .map(|b| format!("{:02}", b % 99 + 1))
-        .collect();
-
-    Ok(v.join(""))
+        .collect()
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/docker.rs"]
+mod tests;

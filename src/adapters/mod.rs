@@ -1,13 +1,11 @@
-pub(crate) mod docker;
-pub(crate) mod host;
-pub(crate) mod nix;
-pub(crate) mod process;
-pub(crate) mod terminal;
-pub(crate) mod workspace;
+mod clap_invocation_parser;
+mod docker;
+mod nix_configurator;
+mod project_settings_store;
+mod user_configurator;
 
-pub(crate) use docker::{DockerCliAdapter, FakeWorkloadAdapter};
-pub(crate) use host::{FakeHostAdapter, LinuxHostAdapter};
-pub(crate) use nix::{FakePackageAdapter, NixCliAdapter};
-pub(crate) use process::{RecordingProcessAdapter, SystemProcessAdapter};
-pub(crate) use terminal::{FakeTerminalAdapter, OsTerminalAdapter};
-pub(crate) use workspace::{FakeWorkspaceAdapter, OsWorkspaceAdapter};
+pub use clap_invocation_parser::ClapInvocationParser;
+pub use docker::DockerEnvironment;
+pub use nix_configurator::NixConfigurator;
+pub use project_settings_store::ProjectSettingsStore;
+pub use user_configurator::UserConfigurator;
