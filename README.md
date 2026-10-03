@@ -7,7 +7,7 @@
 
 ## Status
 
-Wayland, PipeWire, and GPU passthrough are available when creating a container. Wayland and PipeWire require host `XDG_RUNTIME_DIR`; Wayland also requires `WAYLAND_DISPLAY`. Use `spawnbx recreate` after enabling or changing these options. X11, network, and `--allow-missing-integrations` options remain unavailable.
+Wayland, PipeWire, and AMD GPU passthrough are available when creating a container. Wayland and PipeWire require host `XDG_RUNTIME_DIR`; Wayland also requires `WAYLAND_DISPLAY` and `DISPLAY` to pass through Xwayland. An existing `$XAUTHORITY` or `$HOME/.Xauthority` is mounted when available; otherwise the X11 socket is still passed through. AMD GPU passthrough mounts `/dev/dri`. Use `spawnbx recreate` after enabling or changing these options. Network and `--allow-missing-integrations` options remain unavailable.
 
 ## Requirements
 
