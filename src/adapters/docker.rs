@@ -24,21 +24,26 @@ pub struct DockerEnvironment {
 }
 
 impl EnvironmentRuntime for DockerEnvironment {
-    fn attach(&self) -> Result<(), EnvironmentRuntimeError> {
+    fn attach(&self, environment_state: &EnvironmentState) -> Result<(), EnvironmentRuntimeError> {
         tracing::info!(container = self.container_name(), "attaching to container");
         let status = Command::new("docker")
-            .args([
-                "exec",
-                "--interactive",
-                "--tty",
-                "--user",
-                &format!(
-                    "{}:{}",
-                    self.environment_state.host_uid, self.environment_state.host_gid
-                ),
-                self.container_name(),
-                &self.environment_state.shell_program,
-            ])
+            .args(
+                [
+                    "exec",
+                    "--interactive",
+                    "--tty",
+                    "--user",
+                    &format!(
+                        "{}:{}",
+                        self.environment_state.host_uid, self.environment_state.host_gid
+                    ),
+                ]
+                .into_iter()
+                .chain(DockerEnvironment::resolve_additional_params(
+                    environment_state,
+                ))
+                .chain([self.container_name(), &self.environment_state.shell_program]),
+            )
             .status()
             .with_context(|| {
                 format!(
@@ -212,6 +217,24 @@ impl DockerEnvironment {
             )
             .into())
         }
+    }
+
+    fn resolve_additional_params(state: &EnvironmentState) -> Vec<&'static str> {
+        let params = vec![];
+
+        if state.wayland {
+            // push wayland params
+        }
+
+        if state.pipewire {
+            // push pipewire params
+        }
+
+        if state.gpu {
+            // push gpu passthrough params
+        }
+
+        params
     }
 }
 

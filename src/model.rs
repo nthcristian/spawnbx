@@ -3,6 +3,9 @@ pub struct CommandInvocation {
     pub operation: CommandOperation,
     pub additional_package_names: Vec<String>,
     pub requested_shell: Option<String>,
+    pub pipewire: bool,
+    pub wayland: bool,
+    pub gpu: bool,
     pub save_settings: bool,
 }
 
@@ -20,6 +23,9 @@ pub struct EnvironmentState {
     pub container_name_prefix: String,
     pub workspace_root: String,
     pub package_names: Vec<String>,
+    pub pipewire: bool,
+    pub wayland: bool,
+    pub gpu: bool,
     pub shell_program: String,
     pub host_username: String,
     pub host_uid: u32,

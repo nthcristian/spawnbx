@@ -55,7 +55,7 @@ pub fn run() -> Result<(), ApplicationError> {
     }
 
     environment
-        .attach()
+        .attach(&state)
         .map_err(ApplicationError::environment)?;
 
     Ok(())

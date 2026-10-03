@@ -62,6 +62,9 @@ fn assemble_environment_state(
         container_name_prefix,
         shell_program: settings.shell_program.unwrap_or_else(|| "bash".into()),
         package_names: settings.package_names.unwrap_or_default(),
+        wayland: settings.wayland.unwrap_or_default(),
+        pipewire: settings.pipewire.unwrap_or_default(),
+        gpu: settings.gpu.unwrap_or_default(),
         workspace_root: workspace_root.to_string_lossy().into_owned(),
         host_username: host.username,
         host_uid: host.uid,
@@ -74,6 +77,9 @@ fn serialize_settings(state: &EnvironmentState) -> Result<String, EnvironmentSta
         container_name_prefix: Some(state.container_name_prefix.clone()),
         shell_program: Some(state.shell_program.clone()),
         package_names: Some(state.package_names.clone()),
+        wayland: Some(state.wayland),
+        pipewire: Some(state.pipewire),
+        gpu: Some(state.gpu),
     };
 
     serde_yaml::to_string(&settings)
@@ -166,6 +172,10 @@ struct ProjectSettings {
 
     #[serde(rename = "shell")]
     shell_program: Option<String>,
+
+    wayland: Option<bool>,
+    pipewire: Option<bool>,
+    gpu: Option<bool>,
 
     #[serde(rename = "packages")]
     package_names: Option<Vec<String>>,

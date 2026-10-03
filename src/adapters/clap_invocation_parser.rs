@@ -36,6 +36,9 @@ fn parse_from(
         operation,
         additional_package_names: arguments.additional_package_names,
         requested_shell: arguments.requested_shell,
+        wayland: arguments.wayland,
+        pipewire: arguments.pipewire,
+        gpu: arguments.gpu,
         save_settings: arguments.save_settings,
     })
 }
@@ -64,6 +67,15 @@ struct ClapArguments {
         help = "Packages to add to the development container"
     )]
     additional_package_names: Vec<String>,
+
+    #[arg(long = "wayland", help = "Enable wayland support")]
+    wayland: bool,
+
+    #[arg(long = "pipewire", help = "Enable pipewire passthrough")]
+    pipewire: bool,
+
+    #[arg(long = "gpu", help = "Enable GPU passthrough")]
+    gpu: bool,
 
     #[arg(
         long = "save",
