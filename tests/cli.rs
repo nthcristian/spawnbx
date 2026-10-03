@@ -132,14 +132,18 @@ fn missing_container_has_exact_create_argv_and_mounts() {
 }
 
 #[test]
-fn missing_container_creates_wayland_pipewire_and_gpu_integrations() {
+fn missing_container_creates_wayland_pipewire_and_amd_gpu_integrations() {
     let cli = Cli::new();
+    let xauthority = cli.workspace.join("xauthority");
+    fs::write(&xauthority, "cookie").unwrap();
     assert_success(&cli.run(
         &["--wayland", "--pipewire", "--gpu", "update"],
         &[
             ("FAKE_INSPECT", "missing"),
             ("XDG_RUNTIME_DIR", "/run/user/1234"),
             ("WAYLAND_DISPLAY", "wayland-7"),
+            ("DISPLAY", ":0"),
+            ("XAUTHORITY", xauthority.to_str().unwrap()),
         ],
     ));
 
@@ -172,11 +176,19 @@ fn missing_container_creates_wayland_pipewire_and_gpu_integrations() {
             "--volume",
             "/run/user/1234/wayland-7:/run/user/1234/wayland-7",
             "--env",
+            "DISPLAY=:0",
+            "--volume",
+            "/tmp/.X11-unix:/tmp/.X11-unix",
+            "--env",
+            "XAUTHORITY=/tmp/.Xauthority",
+            "--volume",
+            &format!("{}:/tmp/.Xauthority:ro", xauthority.display()),
+            "--env",
             "PIPEWIRE_REMOTE=pipewire-0",
             "--volume",
             "/run/user/1234/pipewire-0:/run/user/1234/pipewire-0",
-            "--gpus",
-            "all",
+            "--device",
+            "/dev/dri",
             image,
             "sleep",
             "infinity"
@@ -192,6 +204,64 @@ fn missing_wayland_environment_prevents_container_creation() {
         "XDG_RUNTIME_DIR",
     );
     assert_eq!(cli.phases(), ["inspect", "stop"]);
+}
+
+#[test]
+fn missing_xwayland_environment_prevents_container_creation() {
+    let cli = Cli::new();
+    assert_failure(
+        &cli.run(
+            &["--wayland", "update"],
+            &[
+                ("FAKE_INSPECT", "missing"),
+                ("XDG_RUNTIME_DIR", "/run/user/1234"),
+                ("WAYLAND_DISPLAY", "wayland-7"),
+            ],
+        ),
+        "DISPLAY",
+    );
+    assert_eq!(cli.phases(), ["inspect", "stop"]);
+}
+
+#[test]
+fn wayland_uses_home_xauthority_when_the_environment_variable_is_unavailable() {
+    let cli = Cli::new();
+    let xauthority = cli.workspace.join(".Xauthority");
+    fs::write(&xauthority, "cookie").unwrap();
+    assert_success(&cli.run(
+        &["--wayland", "update"],
+        &[
+            ("FAKE_INSPECT", "missing"),
+            ("XDG_RUNTIME_DIR", "/run/user/1234"),
+            ("WAYLAND_DISPLAY", "wayland-7"),
+            ("DISPLAY", ":0"),
+            ("HOME", cli.workspace.to_str().unwrap()),
+        ],
+    ));
+
+    assert!(
+        cli.calls("docker")[1].contains(&format!("{}:/tmp/.Xauthority:ro", xauthority.display()))
+    );
+}
+
+#[test]
+fn wayland_allows_socket_only_xwayland_when_no_authority_file_exists() {
+    let cli = Cli::new();
+    assert_success(&cli.run(
+        &["--wayland", "update"],
+        &[
+            ("FAKE_INSPECT", "missing"),
+            ("XDG_RUNTIME_DIR", "/run/user/1234"),
+            ("WAYLAND_DISPLAY", "wayland-7"),
+            ("DISPLAY", ":0"),
+        ],
+    ));
+
+    assert!(
+        !cli.calls("docker")[1]
+            .iter()
+            .any(|argument| argument.starts_with("XAUTHORITY="))
+    );
 }
 
 #[test]

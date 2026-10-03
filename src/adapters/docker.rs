@@ -1,7 +1,7 @@
 use std::{
     fs,
     hash::{DefaultHasher, Hash, Hasher},
-    path::Path,
+    path::{Path, PathBuf},
     process::{Command, Output},
 };
 
@@ -233,6 +233,8 @@ impl DockerEnvironment {
         if state.wayland {
             let display = std::env::var("WAYLAND_DISPLAY")
                 .context("read WAYLAND_DISPLAY for Wayland integration")?;
+            let x11_display =
+                std::env::var("DISPLAY").context("read DISPLAY for Xwayland integration")?;
             let socket = Path::new(
                 runtime_dir
                     .as_deref()
@@ -245,7 +247,20 @@ impl DockerEnvironment {
                 format!("WAYLAND_DISPLAY={display}"),
                 "--volume".into(),
                 format!("{socket}:{socket}"),
+                "--env".into(),
+                format!("DISPLAY={x11_display}"),
+                "--volume".into(),
+                "/tmp/.X11-unix:/tmp/.X11-unix".into(),
             ]);
+
+            if let Some(xauthority) = xauthority_path() {
+                params.extend([
+                    "--env".into(),
+                    "XAUTHORITY=/tmp/.Xauthority".into(),
+                    "--volume".into(),
+                    format!("{}:/tmp/.Xauthority:ro", xauthority.display()),
+                ]);
+            }
         }
 
         if state.pipewire {
@@ -265,7 +280,7 @@ impl DockerEnvironment {
         }
 
         if state.gpu {
-            params.extend(["--gpus".into(), "all".into()]);
+            params.extend(["--device".into(), "/dev/dri".into()]);
         }
 
         Ok(params)
@@ -306,6 +321,16 @@ fn workspace_hash(source: &str) -> String {
         .iter()
         .map(|b| format!("{:02}", b % 99 + 1))
         .collect()
+}
+
+fn xauthority_path() -> Option<PathBuf> {
+    [
+        std::env::var_os("XAUTHORITY").map(PathBuf::from),
+        std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".Xauthority")),
+    ]
+    .into_iter()
+    .flatten()
+    .find(|path| path.is_file())
 }
 
 #[cfg(test)]

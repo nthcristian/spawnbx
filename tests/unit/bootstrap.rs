@@ -124,6 +124,29 @@ fn resolution_saves_the_merged_state_only_when_requested() {
 }
 
 #[test]
+fn resolution_enables_requested_integrations_without_disabling_saved_settings() {
+    let mut store = RecordingStore::new();
+    store.state.wayland = true;
+    let request = CommandInvocation {
+        pipewire: true,
+        gpu: true,
+        save_settings: true,
+        ..invocation()
+    };
+
+    let state = resolve_environment_state(&request, &store).unwrap();
+
+    assert!(state.wayland);
+    assert!(state.pipewire);
+    assert!(state.gpu);
+    let saved = store.saved.borrow();
+    assert_eq!(saved.len(), 1);
+    assert!(saved[0].wayland);
+    assert!(saved[0].pipewire);
+    assert!(saved[0].gpu);
+}
+
+#[test]
 fn explicit_empty_shell_is_not_treated_as_a_missing_override() {
     let request = CommandInvocation {
         requested_shell: Some(String::new()),
