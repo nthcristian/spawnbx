@@ -107,6 +107,9 @@ impl RuntimeEnvironment {
                 .context("temporary path is not UTF-8")?
                 .into(),
             package_names: Vec::new(),
+            wayland: false,
+            pipewire: false,
+            gpu: false,
             shell_program: "/bin/bash".into(),
             host_username: identity("-un")?,
             host_uid: uid,
@@ -201,6 +204,9 @@ fn invocation() -> CommandInvocation {
         operation: CommandOperation::Attach,
         additional_package_names: Vec::new(),
         requested_shell: None,
+        wayland: false,
+        pipewire: false,
+        gpu: false,
         save_settings: false,
     }
 }

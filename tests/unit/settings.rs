@@ -24,6 +24,9 @@ fn absent_fields_default_and_host_identity_is_preserved() {
     assert_eq!(state.container_name_prefix, "project");
     assert_eq!(state.shell_program, "bash");
     assert!(state.package_names.is_empty());
+    assert!(!state.wayland);
+    assert!(!state.pipewire);
+    assert!(!state.gpu);
     assert_eq!(state.workspace_root, "/work/project");
     assert_eq!(state.host_username, "developer");
     assert_eq!((state.host_uid, state.host_gid), (1234, 5678));
@@ -32,11 +35,17 @@ fn absent_fields_default_and_host_identity_is_preserved() {
 #[test]
 fn configured_fields_are_used_without_validation_or_package_deduplication() {
     let settings =
-        serde_yaml::from_str("name: ''\nshell: ''\npackages: [git, git, curl]\n").unwrap();
+        serde_yaml::from_str(
+            "name: ''\nshell: ''\npackages: [git, git, curl]\nwayland: true\npipewire: true\ngpu: true\n",
+        )
+        .unwrap();
     let state = assemble_environment_state(settings, Path::new("/"), host()).unwrap();
     assert_eq!(state.container_name_prefix, "");
     assert_eq!(state.shell_program, "");
     assert_eq!(state.package_names, ["git", "git", "curl"]);
+    assert!(state.wayland);
+    assert!(state.pipewire);
+    assert!(state.gpu);
     assert_eq!(state.workspace_root, "/");
 }
 
@@ -113,24 +122,30 @@ fn malformed_yaml_and_invalid_field_types_remain_load_failures() {
 }
 
 #[test]
-fn saved_yaml_has_only_original_keys_and_round_trips_values() {
+fn saved_yaml_round_trips_environment_settings() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join(SETTINGS_FILE);
     let mut state = state();
     state.container_name_prefix = "my-project".into();
     state.shell_program = "/bin/zsh".into();
     state.package_names = vec!["curl".into(), "git".into(), "curl".into()];
+    state.wayland = true;
+    state.pipewire = true;
+    state.gpu = true;
     save_settings(&path, &serialize_settings(&state).unwrap()).unwrap();
     let yaml = std::fs::read_to_string(&path).unwrap();
     let document: serde_yaml::Value = serde_yaml::from_str(&yaml).unwrap();
     let mapping = document.as_mapping().unwrap();
-    assert_eq!(mapping.len(), 3);
+    assert_eq!(mapping.len(), 6);
     assert_eq!(document["name"].as_str(), Some("my-project"));
     assert_eq!(document["shell"].as_str(), Some("/bin/zsh"));
     assert_eq!(
         document["packages"],
         serde_yaml::to_value(&state.package_names).unwrap()
     );
+    assert_eq!(document["wayland"].as_bool(), Some(true));
+    assert_eq!(document["pipewire"].as_bool(), Some(true));
+    assert_eq!(document["gpu"].as_bool(), Some(true));
     let settings = load_settings(&path).unwrap();
     assert_eq!(
         settings.container_name_prefix.as_deref(),
@@ -138,6 +153,9 @@ fn saved_yaml_has_only_original_keys_and_round_trips_values() {
     );
     assert_eq!(settings.shell_program.as_deref(), Some("/bin/zsh"));
     assert_eq!(settings.package_names, Some(state.package_names));
+    assert_eq!(settings.wayland, Some(true));
+    assert_eq!(settings.pipewire, Some(true));
+    assert_eq!(settings.gpu, Some(true));
 }
 
 #[test]

@@ -4,7 +4,7 @@
 
 - The CLI flow is `src/lib.rs`; `src/contracts/` owns runtime, configurator, state-store, and parser interfaces; `src/adapters/` owns Docker, Nix, user, settings, and Clap implementations.
 - `.spawnbx.yml` is required in the working directory. Only `name`, `shell`, and `packages` are read or saved; CLI options must precede a subcommand because they are not global.
-- Desktop and host integrations are unavailable. Do not document or add behavior for X11, Wayland, PipeWire, GPU, networking, or missing-integration flags without an explicit task.
+- Wayland, PipeWire, and GPU flags apply only while creating a container. Wayland/PipeWire require host `XDG_RUNTIME_DIR`; Wayland also requires `WAYLAND_DISPLAY`. Recreate the container after changing these settings. X11 and networking controls remain unavailable.
 
 ## Behavior To Preserve
 

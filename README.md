@@ -7,7 +7,7 @@
 
 ## Status
 
-Desktop and host integrations are currently unavailable. X11, Wayland, PipeWire, GPU, network, and `--allow-missing-integrations` options are not implemented and are rejected by the CLI.
+Wayland, PipeWire, and GPU passthrough are available when creating a container. Wayland and PipeWire require host `XDG_RUNTIME_DIR`; Wayland also requires `WAYLAND_DISPLAY`. Use `spawnbx recreate` after enabling or changing these options. X11, network, and `--allow-missing-integrations` options remain unavailable.
 
 ## Requirements
 
@@ -33,9 +33,12 @@ shell: fish
 packages:
   - fish
   - ripgrep
+wayland: true
+pipewire: true
+gpu: true
 ```
 
-`name` prefixes the Docker container name. `shell` defaults to `bash`; `packages` defaults to an empty list. Packages are installed with Nix into `/nix/var/nix/profiles/default`.
+`name` prefixes the Docker container name. `shell` defaults to `bash`; `packages` defaults to an empty list. Packages are installed with Nix into `/nix/var/nix/profiles/default`. Integration booleans default to `false`.
 
 ## Commands
 
@@ -54,8 +57,9 @@ Example usage:
 ```sh
 spawnbx --shell fish --packages fish,ripgrep
 spawnbx --save --shell fish --packages fish,ripgrep
+spawnbx --wayland --pipewire --gpu recreate
 ```
 
-`--shell` overrides the attached shell for the invocation. `--packages` adds comma-separated package names to the project configuration for the invocation. `--save` writes the merged name, shell, and package list back to `.spawnbx.yml` before Docker work begins.
+`--shell` overrides the attached shell for the invocation. `--packages` adds comma-separated package names to the project configuration for the invocation. `--wayland`, `--pipewire`, and `--gpu` enable their corresponding container-creation options. `--save` writes the merged values back to `.spawnbx.yml` before Docker work begins.
 
 Progress logs use `RUST_LOG`; normal runs default to INFO and `RUST_LOG=off` suppresses them.

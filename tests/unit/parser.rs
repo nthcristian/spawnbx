@@ -7,7 +7,21 @@ fn no_arguments_defaults_to_attach_without_overrides() {
     assert_eq!(invocation.operation, CommandOperation::Attach);
     assert!(invocation.additional_package_names.is_empty());
     assert!(invocation.requested_shell.is_none());
+    assert!(!invocation.wayland);
+    assert!(!invocation.pipewire);
+    assert!(!invocation.gpu);
     assert!(!invocation.save_settings);
+}
+
+#[test]
+fn integration_flags_enable_their_requested_container_options() {
+    let invocation =
+        parse_from(["spawnbx", "--wayland", "--pipewire", "--gpu", "recreate"]).unwrap();
+
+    assert!(invocation.wayland);
+    assert!(invocation.pipewire);
+    assert!(invocation.gpu);
+    assert_eq!(invocation.operation, CommandOperation::Recreate);
 }
 
 #[test]

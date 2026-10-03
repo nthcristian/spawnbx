@@ -52,6 +52,9 @@ fn state(packages: &[&str]) -> EnvironmentState {
         container_name_prefix: "test".to_owned(),
         workspace_root: "/unused".to_owned(),
         package_names: packages.iter().map(|name| (*name).to_owned()).collect(),
+        wayland: false,
+        pipewire: false,
+        gpu: false,
         shell_program: "bash".to_owned(),
         host_username: "test-user".to_owned(),
         host_uid: 1234,
@@ -64,6 +67,9 @@ fn invocation(operation: CommandOperation) -> CommandInvocation {
         operation,
         additional_package_names: Vec::new(),
         requested_shell: None,
+        wayland: false,
+        pipewire: false,
+        gpu: false,
         save_settings: false,
     }
 }

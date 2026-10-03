@@ -132,6 +132,69 @@ fn missing_container_has_exact_create_argv_and_mounts() {
 }
 
 #[test]
+fn missing_container_creates_wayland_pipewire_and_gpu_integrations() {
+    let cli = Cli::new();
+    assert_success(&cli.run(
+        &["--wayland", "--pipewire", "--gpu", "update"],
+        &[
+            ("FAKE_INSPECT", "missing"),
+            ("XDG_RUNTIME_DIR", "/run/user/1234"),
+            ("WAYLAND_DISPLAY", "wayland-7"),
+        ],
+    ));
+
+    let workspace_mount = format!("{}:/workspace", cli.workspace.display());
+    let home_mount = format!("{}/.spawnbx/home:/home/spawnbx", cli.workspace.display());
+    let image = if cfg!(debug_assertions) {
+        "spawnbx:latest"
+    } else {
+        "ghcr.io/nthcristian/spawnbx:latest"
+    };
+    assert_eq!(
+        cli.calls("docker")[1],
+        [
+            "run",
+            "--detach",
+            "--name",
+            &cli.name(),
+            "--workdir",
+            "/workspace",
+            "--env",
+            "HOME=/home/spawnbx",
+            "--volume",
+            &workspace_mount,
+            "--volume",
+            &home_mount,
+            "--env",
+            "XDG_RUNTIME_DIR=/run/user/1234",
+            "--env",
+            "WAYLAND_DISPLAY=wayland-7",
+            "--volume",
+            "/run/user/1234/wayland-7:/run/user/1234/wayland-7",
+            "--env",
+            "PIPEWIRE_REMOTE=pipewire-0",
+            "--volume",
+            "/run/user/1234/pipewire-0:/run/user/1234/pipewire-0",
+            "--gpus",
+            "all",
+            image,
+            "sleep",
+            "infinity"
+        ]
+    );
+}
+
+#[test]
+fn missing_wayland_environment_prevents_container_creation() {
+    let cli = Cli::new();
+    assert_failure(
+        &cli.run(&["--wayland", "update"], &[("FAKE_INSPECT", "missing")]),
+        "XDG_RUNTIME_DIR",
+    );
+    assert_eq!(cli.phases(), ["inspect", "stop"]);
+}
+
+#[test]
 fn completed_inspect_errors_still_create_home_before_returning() {
     for env in [
         [("FAKE_FAIL_PHASE", "inspect")],

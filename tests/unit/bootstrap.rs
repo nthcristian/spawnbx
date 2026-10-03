@@ -25,6 +25,9 @@ impl RecordingStore {
                 container_name_prefix: "project".into(),
                 workspace_root: "/workspace/project".into(),
                 package_names: vec!["git".into(), "git".into(), "fish".into()],
+                wayland: false,
+                pipewire: false,
+                gpu: false,
                 shell_program: "bash".into(),
                 host_username: "developer".into(),
                 host_uid: 1000,
@@ -66,6 +69,9 @@ fn invocation() -> CommandInvocation {
         operation: CommandOperation::Attach,
         additional_package_names: Vec::new(),
         requested_shell: None,
+        wayland: false,
+        pipewire: false,
+        gpu: false,
         save_settings: false,
     }
 }

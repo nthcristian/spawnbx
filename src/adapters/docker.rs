@@ -24,26 +24,21 @@ pub struct DockerEnvironment {
 }
 
 impl EnvironmentRuntime for DockerEnvironment {
-    fn attach(&self, environment_state: &EnvironmentState) -> Result<(), EnvironmentRuntimeError> {
+    fn attach(&self) -> Result<(), EnvironmentRuntimeError> {
         tracing::info!(container = self.container_name(), "attaching to container");
         let status = Command::new("docker")
-            .args(
-                [
-                    "exec",
-                    "--interactive",
-                    "--tty",
-                    "--user",
-                    &format!(
-                        "{}:{}",
-                        self.environment_state.host_uid, self.environment_state.host_gid
-                    ),
-                ]
-                .into_iter()
-                .chain(DockerEnvironment::resolve_additional_params(
-                    environment_state,
-                ))
-                .chain([self.container_name(), &self.environment_state.shell_program]),
-            )
+            .args([
+                "exec",
+                "--interactive",
+                "--tty",
+                "--user",
+                &format!(
+                    "{}:{}",
+                    self.environment_state.host_uid, self.environment_state.host_gid
+                ),
+                self.container_name(),
+                &self.environment_state.shell_program,
+            ])
             .status()
             .with_context(|| {
                 format!(
@@ -161,26 +156,27 @@ impl DockerEnvironment {
         let workspace_mount = format!("{}:/workspace", self.environment_state.workspace_root);
         let home_mount = format!("{}:/home/spawnbx", home.display());
 
-        self.run_docker_successfully(
-            &[
-                "run",
-                "--detach",
-                "--name",
-                self.container_name(),
-                "--workdir",
-                "/workspace",
-                "--env",
-                "HOME=/home/spawnbx",
-                "--volume",
-                &workspace_mount,
-                "--volume",
-                &home_mount,
-                DEFAULT_IMAGE,
-                "sleep",
-                "infinity",
-            ],
-            "create",
-        )
+        let additional_params = Self::resolve_additional_params(&self.environment_state)?;
+        let args = [
+            "run",
+            "--detach",
+            "--name",
+            self.container_name(),
+            "--workdir",
+            "/workspace",
+            "--env",
+            "HOME=/home/spawnbx",
+            "--volume",
+            &workspace_mount,
+            "--volume",
+            &home_mount,
+        ]
+        .into_iter()
+        .chain(additional_params.iter().map(String::as_str))
+        .chain([DEFAULT_IMAGE, "sleep", "infinity"])
+        .collect::<Vec<_>>();
+
+        self.run_docker_successfully(&args, "create")
     }
 
     fn run_docker(
@@ -219,22 +215,60 @@ impl DockerEnvironment {
         }
     }
 
-    fn resolve_additional_params(state: &EnvironmentState) -> Vec<&'static str> {
-        let params = vec![];
+    fn resolve_additional_params(
+        state: &EnvironmentState,
+    ) -> Result<Vec<String>, EnvironmentRuntimeError> {
+        let runtime_dir = (state.wayland || state.pipewire)
+            .then(|| {
+                std::env::var("XDG_RUNTIME_DIR")
+                    .context("read XDG_RUNTIME_DIR for desktop integration")
+            })
+            .transpose()?;
+        let mut params = Vec::new();
+
+        if let Some(runtime_dir) = &runtime_dir {
+            params.extend(["--env".into(), format!("XDG_RUNTIME_DIR={runtime_dir}")]);
+        }
 
         if state.wayland {
-            // push wayland params
+            let display = std::env::var("WAYLAND_DISPLAY")
+                .context("read WAYLAND_DISPLAY for Wayland integration")?;
+            let socket = Path::new(
+                runtime_dir
+                    .as_deref()
+                    .context("Wayland integration requires XDG_RUNTIME_DIR")?,
+            )
+            .join(&display);
+            let socket = socket.display().to_string();
+            params.extend([
+                "--env".into(),
+                format!("WAYLAND_DISPLAY={display}"),
+                "--volume".into(),
+                format!("{socket}:{socket}"),
+            ]);
         }
 
         if state.pipewire {
-            // push pipewire params
+            let socket = Path::new(
+                runtime_dir
+                    .as_deref()
+                    .context("PipeWire integration requires XDG_RUNTIME_DIR")?,
+            )
+            .join("pipewire-0");
+            let socket = socket.display().to_string();
+            params.extend([
+                "--env".into(),
+                "PIPEWIRE_REMOTE=pipewire-0".into(),
+                "--volume".into(),
+                format!("{socket}:{socket}"),
+            ]);
         }
 
         if state.gpu {
-            // push gpu passthrough params
+            params.extend(["--gpus".into(), "all".into()]);
         }
 
-        params
+        Ok(params)
     }
 }
 

@@ -55,7 +55,7 @@ pub fn run() -> Result<(), ApplicationError> {
     }
 
     environment
-        .attach(&state)
+        .attach()
         .map_err(ApplicationError::environment)?;
 
     Ok(())
@@ -70,6 +70,9 @@ fn resolve_environment_state(
     if let Some(shell) = &invocation.requested_shell {
         state.shell_program.clone_from(shell);
     }
+    state.wayland |= invocation.wayland;
+    state.pipewire |= invocation.pipewire;
+    state.gpu |= invocation.gpu;
 
     let packages: HashSet<_> = invocation
         .additional_package_names
