@@ -21,7 +21,12 @@ fn integration_flags_enable_their_requested_container_options() {
     assert!(invocation.wayland);
     assert!(invocation.pipewire);
     assert!(invocation.gpu);
-    assert_eq!(invocation.operation, CommandOperation::Recreate);
+    assert_eq!(
+        invocation.operation,
+        CommandOperation::Recreate {
+            allow_missing_integrations: false
+        }
+    );
 }
 
 #[test]
@@ -29,7 +34,12 @@ fn every_subcommand_preserves_its_operation_and_update_arguments() {
     for (arguments, expected) in [
         (vec!["remove"], CommandOperation::Remove),
         (vec!["stop"], CommandOperation::Stop),
-        (vec!["recreate"], CommandOperation::Recreate),
+        (
+            vec!["recreate"],
+            CommandOperation::Recreate {
+                allow_missing_integrations: false,
+            },
+        ),
         (
             vec!["update"],
             CommandOperation::Update {

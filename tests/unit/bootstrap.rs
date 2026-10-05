@@ -28,6 +28,7 @@ impl RecordingStore {
                 wayland: false,
                 pipewire: false,
                 gpu: false,
+                allow_missing_integrations: false,
                 shell_program: "bash".into(),
                 host_username: "developer".into(),
                 host_uid: 1000,
@@ -73,6 +74,7 @@ fn invocation() -> CommandInvocation {
         pipewire: false,
         gpu: false,
         save_settings: false,
+        allow_missing_integrations: false,
     }
 }
 
@@ -162,7 +164,9 @@ fn resolution_does_not_depend_on_operation() {
         CommandOperation::Attach,
         CommandOperation::Remove,
         CommandOperation::Stop,
-        CommandOperation::Recreate,
+        CommandOperation::Recreate {
+            allow_missing_integrations: false,
+        },
         CommandOperation::Update {
             package_names: vec!["not-an-additional-package".into()],
         },

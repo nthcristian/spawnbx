@@ -132,11 +132,12 @@ fn saved_yaml_round_trips_environment_settings() {
     state.wayland = true;
     state.pipewire = true;
     state.gpu = true;
+    state.allow_missing_integrations = true;
     save_settings(&path, &serialize_settings(&state).unwrap()).unwrap();
     let yaml = std::fs::read_to_string(&path).unwrap();
     let document: serde_yaml::Value = serde_yaml::from_str(&yaml).unwrap();
     let mapping = document.as_mapping().unwrap();
-    assert_eq!(mapping.len(), 6);
+    assert_eq!(mapping.len(), 7);
     assert_eq!(document["name"].as_str(), Some("my-project"));
     assert_eq!(document["shell"].as_str(), Some("/bin/zsh"));
     assert_eq!(
@@ -146,6 +147,7 @@ fn saved_yaml_round_trips_environment_settings() {
     assert_eq!(document["wayland"].as_bool(), Some(true));
     assert_eq!(document["pipewire"].as_bool(), Some(true));
     assert_eq!(document["gpu"].as_bool(), Some(true));
+    assert_eq!(document["allow_missing_integrations"].as_bool(), Some(true));
     let settings = load_settings(&path).unwrap();
     assert_eq!(
         settings.container_name_prefix.as_deref(),
@@ -156,6 +158,7 @@ fn saved_yaml_round_trips_environment_settings() {
     assert_eq!(settings.wayland, Some(true));
     assert_eq!(settings.pipewire, Some(true));
     assert_eq!(settings.gpu, Some(true));
+    assert_eq!(settings.allow_missing_integrations, Some(true));
 }
 
 #[test]

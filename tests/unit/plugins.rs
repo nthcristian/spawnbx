@@ -55,6 +55,7 @@ fn state(packages: &[&str]) -> EnvironmentState {
         wayland: false,
         pipewire: false,
         gpu: false,
+        allow_missing_integrations: false,
         shell_program: "bash".to_owned(),
         host_username: "test-user".to_owned(),
         host_uid: 1234,
@@ -71,6 +72,7 @@ fn invocation(operation: CommandOperation) -> CommandInvocation {
         pipewire: false,
         gpu: false,
         save_settings: false,
+        allow_missing_integrations: false,
     }
 }
 
@@ -147,7 +149,9 @@ fn characterization_non_update_operations_still_configure_without_upgrading() {
         CommandOperation::Attach,
         CommandOperation::Remove,
         CommandOperation::Stop,
-        CommandOperation::Recreate,
+        CommandOperation::Recreate {
+            allow_missing_integrations: false,
+        },
     ] {
         let recording = RecordingExecutor::new([Ok(output("")), Ok(output(GIT_PROFILE))]);
         NixConfigurator::configure(

@@ -110,6 +110,7 @@ impl RuntimeEnvironment {
             wayland: false,
             pipewire: false,
             gpu: false,
+            allow_missing_integrations: false,
             shell_program: "/bin/bash".into(),
             host_username: identity("-un")?,
             host_uid: uid,
@@ -208,6 +209,7 @@ fn invocation() -> CommandInvocation {
         pipewire: false,
         gpu: false,
         save_settings: false,
+        allow_missing_integrations: false,
     }
 }
 
