@@ -1,6 +1,6 @@
 FROM --platform=linux/amd64 archlinux:base-devel
 
-LABEL org.opencontainers.image.version="0.1.1" \
+LABEL org.opencontainers.image.version="0.1.2" \
     org.opencontainers.image.platform="linux/amd64"
 
 RUN pacman -Syu --noconfirm \
