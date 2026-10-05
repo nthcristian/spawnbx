@@ -25,7 +25,10 @@ pub fn run() -> Result<(), ApplicationError> {
 
     if matches!(
         invocation.operation,
-        CommandOperation::Remove | CommandOperation::Recreate
+        CommandOperation::Remove
+            | CommandOperation::Recreate {
+                allow_missing_integrations: _
+            }
     ) {
         environment
             .remove()

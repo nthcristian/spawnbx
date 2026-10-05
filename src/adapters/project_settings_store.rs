@@ -69,6 +69,7 @@ fn assemble_environment_state(
         host_username: host.username,
         host_uid: host.uid,
         host_gid: host.gid,
+        allow_missing_integrations: settings.allow_missing_integrations.unwrap_or_default(),
     })
 }
 
@@ -80,6 +81,7 @@ fn serialize_settings(state: &EnvironmentState) -> Result<String, EnvironmentSta
         wayland: Some(state.wayland),
         pipewire: Some(state.pipewire),
         gpu: Some(state.gpu),
+        allow_missing_integrations: Some(state.allow_missing_integrations),
     };
 
     serde_yaml::to_string(&settings)
@@ -176,6 +178,8 @@ struct ProjectSettings {
     wayland: Option<bool>,
     pipewire: Option<bool>,
     gpu: Option<bool>,
+
+    allow_missing_integrations: Option<bool>,
 
     #[serde(rename = "packages")]
     package_names: Option<Vec<String>>,

@@ -56,6 +56,10 @@ Coverage includes create/reuse/restart/remove, repeated user setup, mapped UID/G
 
 Runtime failures in the unchanged user/group scripts remain failures. Interactive attach and the invalid literal quoted update-all argument `'.*'` are outside the successful runtime workflows. These tests do not establish lock-file reproducibility.
 
+### Desktop Integration Tests
+
+The Docker argument tests use temporary runtime directories and placeholder Wayland/PipeWire socket paths because integration validation happens before Docker creation. Keep those tests isolated from the real host display server. Test both strict failure and `allow_missing_integrations` omission behavior whenever changing desktop integration detection.
+
 ## Generated Files
 
 Do not commit local build or runtime state:
@@ -80,8 +84,8 @@ Avoid unrelated formatting or refactoring in the same pull request.
 
 ## Releases
 
-Pushes to `main` publish the npm binary. The npm workflow compares `package.json` with the published `spawnbx` version, bumps the patch version when needed, commits that version bump with `[skip ci]`, and publishes the binary.
+Pushes to `main` publish the npm binary. The npm workflow compares `package.json` with the published `spawnbx` version, bumps the patch version when needed, commits that version bump with `[skip ci]`, and publishes the binary. Do not manually bump `package.json` for a release.
 
-The container workflow publishes `ghcr.io/nthcristian/spawnbx:latest` only when `Dockerfile` changes on `main`.
+The container workflow publishes `ghcr.io/nthcristian/spawnbx:latest` only when `Dockerfile` changes on `main`; runtime-code-only releases do not publish a new image.
 
 Release-related changes should preserve the npm trusted publisher configuration and the `NPM_PUBLISH` GitHub environment. Do not add registry tokens or other credentials to the repository.

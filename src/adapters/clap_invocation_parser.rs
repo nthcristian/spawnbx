@@ -28,7 +28,11 @@ fn parse_from(
         None => CommandOperation::Attach,
         Some(ClapCommand::Update { package_names }) => CommandOperation::Update { package_names },
         Some(ClapCommand::Stop) => CommandOperation::Stop,
-        Some(ClapCommand::Recreate) => CommandOperation::Recreate,
+        Some(ClapCommand::Recreate {
+            allow_missing_integrations,
+        }) => CommandOperation::Recreate {
+            allow_missing_integrations,
+        },
         Some(ClapCommand::Remove) => CommandOperation::Remove,
     };
 
@@ -40,6 +44,7 @@ fn parse_from(
         pipewire: arguments.pipewire,
         gpu: arguments.gpu,
         save_settings: arguments.save_settings,
+        allow_missing_integrations: arguments.allow_missing_integrations,
     })
 }
 
@@ -82,6 +87,12 @@ struct ClapArguments {
         help = "Save these options to the project settings file"
     )]
     save_settings: bool,
+
+    #[arg(
+        long = "allow-missing-integrations",
+        help = "Allow creating a container without the missing integrations"
+    )]
+    allow_missing_integrations: bool,
 }
 
 #[derive(Debug, Subcommand)]
@@ -96,7 +107,13 @@ enum ClapCommand {
     #[command(about = "Stop the container")]
     Stop,
     #[command(about = "Recreate the container")]
-    Recreate,
+    Recreate {
+        #[arg(
+            long = "allow-missing-integrations",
+            help = "Allow creating a container without the missing integrations"
+        )]
+        allow_missing_integrations: bool,
+    },
 }
 
 #[cfg(test)]

@@ -218,69 +218,130 @@ impl DockerEnvironment {
     fn resolve_additional_params(
         state: &EnvironmentState,
     ) -> Result<Vec<String>, EnvironmentRuntimeError> {
-        let runtime_dir = (state.wayland || state.pipewire)
-            .then(|| {
-                std::env::var("XDG_RUNTIME_DIR")
-                    .context("read XDG_RUNTIME_DIR for desktop integration")
-            })
-            .transpose()?;
+        let runtime_dir = if state.wayland || state.pipewire {
+            match std::env::var("XDG_RUNTIME_DIR") {
+                Ok(runtime_dir) if Path::new(&runtime_dir).is_dir() => Some(runtime_dir),
+                Ok(_) if state.allow_missing_integrations => None,
+                Ok(runtime_dir) => {
+                    return Err(anyhow::anyhow!(
+                        "desktop integration runtime directory is unavailable: {runtime_dir}"
+                    )
+                    .into());
+                }
+                Err(_) if state.allow_missing_integrations => None,
+                Err(error) => {
+                    return Err(anyhow::Error::from(error)
+                        .context("read XDG_RUNTIME_DIR for desktop integration")
+                        .into());
+                }
+            }
+        } else {
+            None
+        };
         let mut params = Vec::new();
+        let mut uses_runtime_dir = false;
 
-        if let Some(runtime_dir) = &runtime_dir {
-            params.extend(["--env".into(), format!("XDG_RUNTIME_DIR={runtime_dir}")]);
-        }
-
-        if state.wayland {
-            let display = std::env::var("WAYLAND_DISPLAY")
-                .context("read WAYLAND_DISPLAY for Wayland integration")?;
-            let x11_display =
-                std::env::var("DISPLAY").context("read DISPLAY for Xwayland integration")?;
-            let socket = Path::new(
-                runtime_dir
-                    .as_deref()
-                    .context("Wayland integration requires XDG_RUNTIME_DIR")?,
-            )
-            .join(&display);
-            let socket = socket.display().to_string();
-            params.extend([
-                "--env".into(),
-                format!("WAYLAND_DISPLAY={display}"),
-                "--volume".into(),
-                format!("{socket}:{socket}"),
-                "--env".into(),
-                format!("DISPLAY={x11_display}"),
-                "--volume".into(),
-                "/tmp/.X11-unix:/tmp/.X11-unix".into(),
-            ]);
-
-            if let Some(xauthority) = xauthority_path() {
+        if state.wayland
+            && let Some(runtime_dir) = runtime_dir.as_deref()
+        {
+            let socket = std::env::var("WAYLAND_DISPLAY")
+                .ok()
+                .map(|display| Path::new(runtime_dir).join(display));
+            if socket.as_ref().is_none_or(|socket| !socket.exists()) {
+                if !state.allow_missing_integrations {
+                    let socket = socket.as_ref().map_or_else(
+                        || runtime_dir.to_owned(),
+                        |socket| socket.display().to_string(),
+                    );
+                    return Err(anyhow::anyhow!("Wayland socket is unavailable: {socket}").into());
+                }
+            } else if let Some(socket) = socket {
+                uses_runtime_dir = true;
+                let socket = socket.display().to_string();
+                let display = std::env::var("WAYLAND_DISPLAY")
+                    .context("read WAYLAND_DISPLAY for Wayland integration")?;
                 params.extend([
                     "--env".into(),
-                    "XAUTHORITY=/tmp/.Xauthority".into(),
+                    format!("WAYLAND_DISPLAY={display}"),
                     "--volume".into(),
-                    format!("{}:/tmp/.Xauthority:ro", xauthority.display()),
+                    format!("{socket}:{socket}"),
+                ]);
+
+                let x11_display = std::env::var("DISPLAY").ok().filter(|display| {
+                    display
+                        .strip_prefix(':')
+                        .and_then(|display| display.split('.').next())
+                        .is_some_and(|number| {
+                            Path::new("/tmp/.X11-unix")
+                                .join(format!("X{number}"))
+                                .exists()
+                        })
+                });
+                if let Some(x11_display) = &x11_display {
+                    params.extend([
+                        "--env".into(),
+                        format!("DISPLAY={x11_display}"),
+                        "--volume".into(),
+                        "/tmp/.X11-unix:/tmp/.X11-unix".into(),
+                    ]);
+                }
+
+                if x11_display.is_some()
+                    && let Some(xauthority) = xauthority_path()
+                {
+                    params.extend([
+                        "--env".into(),
+                        "XAUTHORITY=/tmp/.Xauthority".into(),
+                        "--volume".into(),
+                        format!("{}:/tmp/.Xauthority:ro", xauthority.display()),
+                    ]);
+                }
+            }
+        }
+
+        if state.pipewire
+            && let Some(runtime_dir) = runtime_dir.as_deref()
+        {
+            let socket = Path::new(runtime_dir).join("pipewire-0");
+            if !socket.exists() {
+                if !state.allow_missing_integrations {
+                    return Err(anyhow::anyhow!(
+                        "PipeWire socket is unavailable: {}",
+                        socket.display()
+                    )
+                    .into());
+                }
+            } else {
+                uses_runtime_dir = true;
+                let socket = socket.display().to_string();
+                params.extend([
+                    "--env".into(),
+                    "PIPEWIRE_REMOTE=pipewire-0".into(),
+                    "--volume".into(),
+                    format!("{socket}:{socket}"),
                 ]);
             }
         }
 
-        if state.pipewire {
-            let socket = Path::new(
-                runtime_dir
-                    .as_deref()
-                    .context("PipeWire integration requires XDG_RUNTIME_DIR")?,
-            )
-            .join("pipewire-0");
-            let socket = socket.display().to_string();
-            params.extend([
-                "--env".into(),
-                "PIPEWIRE_REMOTE=pipewire-0".into(),
-                "--volume".into(),
-                format!("{socket}:{socket}"),
-            ]);
+        if uses_runtime_dir {
+            let runtime_dir =
+                runtime_dir.context("enabled desktop integration requires XDG_RUNTIME_DIR")?;
+            params.insert(0, format!("XDG_RUNTIME_DIR={runtime_dir}"));
+            params.insert(0, "--env".into());
         }
 
         if state.gpu {
-            params.extend(["--device".into(), "/dev/dri".into()]);
+            let amd_available = Path::new("/dev/dri").exists();
+            let nvidia_available = Path::new("/dev/nvidiactl").exists();
+            if !amd_available && !nvidia_available && !state.allow_missing_integrations {
+                return Err(anyhow::anyhow!("no supported GPU device is available").into());
+            }
+            if amd_available {
+                params.extend(["--device".into(), "/dev/dri".into()]);
+            }
+            if nvidia_available {
+                params.extend(["--gpus".into(), "all".into()]);
+            }
         }
 
         Ok(params)

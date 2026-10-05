@@ -7,6 +7,7 @@ pub struct CommandInvocation {
     pub wayland: bool,
     pub gpu: bool,
     pub save_settings: bool,
+    pub allow_missing_integrations: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -15,7 +16,7 @@ pub enum CommandOperation {
     Update { package_names: Vec<String> },
     Remove,
     Stop,
-    Recreate,
+    Recreate { allow_missing_integrations: bool },
 }
 
 #[derive(Debug, Clone)]
@@ -30,6 +31,7 @@ pub struct EnvironmentState {
     pub host_username: String,
     pub host_uid: u32,
     pub host_gid: u32,
+    pub allow_missing_integrations: bool,
 }
 
 #[derive(Debug)]

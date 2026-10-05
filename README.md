@@ -5,9 +5,11 @@
 
 `spawnbx` runs a project-local Docker development environment with a Nix system profile. It bind-mounts the project at `/workspace`, creates a container user with the host UID/GID, and stores that user's home at `.spawnbx/home`.
 
-## Status
+## Production Release
 
-Wayland, PipeWire, and AMD GPU passthrough are available when creating a container. Wayland and PipeWire require host `XDG_RUNTIME_DIR`; Wayland also requires `WAYLAND_DISPLAY` and `DISPLAY` to pass through Xwayland. An existing `$XAUTHORITY` or `$HOME/.Xauthority` is mounted when available; otherwise the X11 socket is still passed through. AMD GPU passthrough mounts `/dev/dri`. Use `spawnbx recreate` after enabling or changing these options. Network and `--allow-missing-integrations` options remain unavailable.
+Version 1.0.8 is the first production release. It supports project-local Docker environments, Nix package reconciliation, and optional Wayland, PipeWire, and GPU passthrough.
+
+Integrations apply only when creating a container, so use `spawnbx recreate` after changing them. Missing host prerequisites fail before Docker creation by default. Set `allow_missing_integrations: true` in `.spawnbx.yml` to omit unavailable requested integrations instead.
 
 ## Requirements
 
@@ -36,9 +38,12 @@ packages:
 wayland: true
 pipewire: true
 gpu: true
+allow_missing_integrations: true
 ```
 
-`name` prefixes the Docker container name. `shell` defaults to `bash`; `packages` defaults to an empty list. Packages are installed with Nix into `/nix/var/nix/profiles/default`. Integration booleans default to `false`.
+`name` prefixes the Docker container name. `shell` defaults to `bash`; `packages` defaults to an empty list. Packages are installed with Nix into `/nix/var/nix/profiles/default`. Integration booleans and `allow_missing_integrations` default to `false`.
+
+Wayland requires `XDG_RUNTIME_DIR`, `WAYLAND_DISPLAY`, and its host socket. PipeWire requires `XDG_RUNTIME_DIR/pipewire-0`. Xwayland is forwarded only when the host `DISPLAY` points to an available X11 socket; an existing `$XAUTHORITY` or `$HOME/.Xauthority` is mounted when available. GPU passthrough uses `/dev/dri` for AMD/DRM and Docker GPU allocation when NVIDIA devices are present.
 
 ## Commands
 
@@ -60,6 +65,6 @@ spawnbx --save --shell fish --packages fish,ripgrep
 spawnbx --wayland --pipewire --gpu recreate
 ```
 
-`--shell` overrides the attached shell for the invocation. `--packages` adds comma-separated package names to the project configuration for the invocation. `--wayland`, `--pipewire`, and `--gpu` enable their corresponding container-creation options. `--save` writes the merged values back to `.spawnbx.yml` before Docker work begins.
+`--shell` overrides the attached shell for the invocation. `--packages` adds comma-separated package names to the project configuration for the invocation. `--wayland`, `--pipewire`, and `--gpu` enable their corresponding container-creation options. `--save` writes the merged values back to `.spawnbx.yml` before Docker work begins. Place these options before the subcommand.
 
 Progress logs use `RUST_LOG`; normal runs default to INFO and `RUST_LOG=off` suppresses them.
